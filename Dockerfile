@@ -4,7 +4,7 @@
 # Multi-stage build for Next.js 16 (standalone) + Prisma + Bun
 # ============================================================
 
-ARG BUN_VERSION=1.1-slim
+ARG BUN_VERSION=1.3.14-slim
 
 # ---------- Stage 1: base ----------
 FROM oven/bun:${BUN_VERSION} AS base
@@ -21,16 +21,10 @@ WORKDIR /app
 
 # FIX: the repo ships the new text-based "bun.lock", not the old
 # binary "bun.lockb". 
-COPY package.json bun.lock* bun.lockb* ./
+COPY package.json bun.lock ./
 COPY prisma ./prisma
 
-RUN if [ -f bun.lock ]; then \
-      bun install --frozen-lockfile; \
-    elif [ -f bun.lockb ]; then \
-      bun install --frozen-lockfile; \
-    else \
-      bun install; \
-    fi
+RUN bun install --frozen-lockfile
 
 # ---------- Stage 3: builder ----------
 FROM base AS builder
