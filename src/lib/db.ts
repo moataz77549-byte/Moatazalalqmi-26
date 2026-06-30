@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { setupGlobalErrorHandling } from './errors';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -17,6 +18,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 
 // Graceful shutdown handling
 if (typeof process !== 'undefined') {
+  setupGlobalErrorHandling();
   const shutdown = async () => {
     console.log('Shutting down Prisma client...');
     await db.$disconnect();

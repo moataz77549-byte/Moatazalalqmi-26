@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { recordRequestDuration } from './lib/metrics';
 
 // Security headers for all responses
 const SECURITY_HEADERS: Record<string, string> = {
@@ -71,6 +72,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Request logging
+  const startTime = Date.now();
+  const clientIP = getClientIP(request);
+  console.log(JSON.stringify({
+    level: 'info',
+    ts: new Date().toISOString(),
+    msg: 'Incoming request',
+    method: request.method,
+    url: request.url,
+    ip: clientIP,
+    userAgent: request.headers.get('user-agent') || 'unknown'
+  }));
+
   // Apply rate limiting to configured routes
   for (const config of RATE_LIMIT_CONFIG) {
     if (config.pattern.test(pathname)) {
@@ -107,8 +121,21 @@ export function middleware(request: NextRequest) {
     response.headers.set(key, value);
   }
 
+  // Log response time
+  response.headers.set('X-Response-Time', `${Date.now() - startTime}ms`);
+  const durationMs = Date.now() - startTime;
+  recordRequestDuration(request.method, pathname, response.status, durationMs);
+  console.log(JSON.stringify({
+    level: 'info',
+    ts: new Date().toISOString(),
+    msg: 'Request completed',
+    method: request.method,
+    url: request.url,
+    status: response.status,
+    durationMs: durationMs
+  }));
+
   // Add rate limit headers
-  const clientIP = getClientIP(request);
   for (const config of RATE_LIMIT_CONFIG) {
     if (config.pattern.test(pathname)) {
       const rateLimitKey = `${pathname}:${clientIP}`;
