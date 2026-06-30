@@ -1,0 +1,2002 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useRef, useCallback } from 'react';
+     4→import {
+     5→  LayoutDashboard,
+     6→  MessageSquare,
+     7→  Building2,
+     8→  FolderKanban,
+     9→  Settings,
+    10→  Shield,
+    11→  Sun,
+    12→  Moon,
+    13→  Menu,
+    14→  LogOut,
+    15→  Send,
+    16→  Plus,
+    17→  Upload,
+    18→  Users,
+    19→  Key,
+    20→  Bell,
+    21→  Lock,
+    22→  Activity,
+    23→  Flag,
+    24→  FileText,
+    25→  Zap,
+    26→  Brain,
+    27→  Eye,
+    28→  EyeOff,
+    29→  Globe,
+    30→  Search,
+    31→  Bot,
+    32→  Loader2,
+    33→  Server,
+    34→  Cpu,
+    35→  DollarSign,
+    36→  TestTube,
+    37→  CheckCircle2,
+    38→  AlertCircle,
+    39→  Clock,
+    40→  TrendingUp,
+    41→  BarChart3,
+    42→  Hash,
+    43→  Gauge,
+    44→  Copy,
+    45→  Trash2,
+    46→  RefreshCw,
+    47→  Calendar,
+    48→} from 'lucide-react';
+    49→import { useTheme } from 'next-themes';
+    50→import { useAppStore } from '@/lib/store';
+    51→import { t } from '@/lib/i18n';
+    52→import { cn } from '@/lib/utils';
+    53→
+    54→// shadcn/ui
+    55→import { Button } from '@/components/ui/button';
+    56→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+    57→import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+    58→import { Input } from '@/components/ui/input';
+    59→import { Label } from '@/components/ui/label';
+    60→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+    61→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+    62→import { Badge } from '@/components/ui/badge';
+    63→import { Separator } from '@/components/ui/separator';
+    64→import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+    65→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    66→import { Switch } from '@/components/ui/switch';
+    67→import { Checkbox } from '@/components/ui/checkbox';
+    68→import { ScrollArea } from '@/components/ui/scroll-area';
+    69→import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+    70→import { Textarea } from '@/components/ui/textarea';
+    71→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+    72→
+    73→// ─── Types ────────────────────────────────────────────────────
+    74→
+    75→type Tab = 'dashboard' | 'chat' | 'organizations' | 'projects' | 'settings' | 'admin' | 'gateway';
+    76→
+    77→interface ChatMessage {
+    78→  id: string;
+    79→  role: 'user' | 'assistant';
+    80→  content: string;
+    81→  timestamp: Date;
+    82→}
+    83→
+    84→// ─── Mock Data ────────────────────────────────────────────────
+    85→
+    86→const MOCK_PROVIDERS = [
+    87→  { value: 'openai', label: 'OpenAI' },
+    88→  { value: 'anthropic', label: 'Anthropic' },
+    89→  { value: 'gemini', label: 'Google Gemini' },
+    90→  { value: 'deepseek', label: 'DeepSeek' },
+    91→  { value: 'groq', label: 'Groq' },
+    92→  { value: 'mistral', label: 'Mistral AI' },
+    93→  { value: 'ollama', label: 'Ollama (Local)' },
+    94→];
+    95→
+    96→const MOCK_MODELS: Record<string, { value: string; label: string }[]> = {
+    97→  openai: [
+    98→    { value: 'gpt-4o', label: 'GPT-4o' },
+    99→    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+   100→    { value: 'o1', label: 'o1' },
+   101→  ],
+   102→  anthropic: [
+   103→    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+   104→    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+   105→  ],
+   106→  gemini: [
+   107→    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+   108→    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+   109→  ],
+   110→  deepseek: [
+   111→    { value: 'deepseek-chat', label: 'DeepSeek V3' },
+   112→    { value: 'deepseek-reasoner', label: 'DeepSeek R1' },
+   113→  ],
+   114→  groq: [
+   115→    { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
+   116→    { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
+   117→  ],
+   118→  mistral: [
+   119→    { value: 'mistral-large-latest', label: 'Mistral Large' },
+   120→    { value: 'codestral-latest', label: 'Codestral' },
+   121→  ],
+   122→  ollama: [
+   123→    { value: 'llama3.1', label: 'Llama 3.1' },
+   124→    { value: 'qwen2.5', label: 'Qwen 2.5' },
+   125→  ],
+   126→};
+   127→
+   128→const MOCK_ACTIVITY = [
+   129→  { id: '1', action: 'Created organization', resource: 'Acme Corp', time: '2 hours ago', Icon: Building2 },
+   130→  { id: '2', action: 'New chat started', resource: 'GPT-4o Analysis', time: '4 hours ago', Icon: MessageSquare },
+   131→  { id: '3', action: 'Uploaded file', resource: 'report-q4.pdf', time: '1 day ago', Icon: Upload },
+   132→  { id: '4', action: 'Project updated', resource: 'Marketing AI', time: '2 days ago', Icon: FolderKanban },
+   133→  { id: '5', action: 'API key created', resource: 'Production Key', time: '3 days ago', Icon: Key },
+   134→];
+   135→
+   136→const MOCK_ORGS = [
+   137→  { id: '1', name: 'Acme Corp', slug: 'acme-corp', description: 'AI solutions for enterprise', members: 12, projects: 5 },
+   138→  { id: '2', name: 'TechVentures', slug: 'techventures', description: 'Innovation lab for startups', members: 8, projects: 3 },
+   139→  { id: '3', name: 'DataFlow', slug: 'dataflow', description: 'Data analytics and AI pipelines', members: 5, projects: 2 },
+   140→];
+   141→
+   142→const MOCK_PROJECTS = [
+   143→  { id: '1', name: 'Marketing AI', slug: 'marketing-ai', description: 'AI-powered marketing automation', icon: '🚀', color: '#06b6d4' },
+   144→  { id: '2', name: 'Support Bot', slug: 'support-bot', description: 'Customer support chatbot', icon: '🤖', color: '#10b981' },
+   145→  { id: '3', name: 'Data Pipeline', slug: 'data-pipeline', description: 'ETL and data processing', icon: '📊', color: '#f59e0b' },
+   146→  { id: '4', name: 'Code Assistant', slug: 'code-assistant', description: 'AI code review and suggestions', icon: '💻', color: '#8b5cf6' },
+   147→];
+   148→
+   149→const MOCK_FEATURE_FLAGS = [
+   150→  { id: '1', key: 'new_chat_ui', name: 'New Chat Interface', type: 'BOOLEAN', value: 'true', isActive: true },
+   151→  { id: '2', key: 'dark_mode_beta', name: 'Dark Mode Beta', type: 'BOOLEAN', value: 'false', isActive: false },
+   152→  { id: '3', key: 'agent_workflow', name: 'Agent Workflow', type: 'PERCENTAGE', value: '25', isActive: true },
+   153→  { id: '4', key: 'vector_search', name: 'Vector Search', type: 'BOOLEAN', value: 'true', isActive: true },
+   154→];
+   155→
+   156→const MOCK_AUDIT_LOG = [
+   157→  { id: '1', action: 'LOGIN', resource: 'session', user: 'admin@moataz.ai', date: '2025-06-26 10:30' },
+   158→  { id: '2', action: 'CREATE', resource: 'organization', user: 'admin@moataz.ai', date: '2025-06-26 09:15' },
+   159→  { id: '3', action: 'API_KEY_CREATED', resource: 'api-key', user: 'user@moataz.ai', date: '2025-06-25 16:45' },
+   160→  { id: '4', action: 'UPDATE', resource: 'project', user: 'admin@moataz.ai', date: '2025-06-25 14:20' },
+   161→  { id: '5', action: 'DELETE', resource: 'chat', user: 'user@moataz.ai', date: '2025-06-25 11:00' },
+   162→];
+   163→
+   164→const PROJECT_COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
+   165→const PROJECT_ICONS = ['🚀', '🤖', '📊', '💻', '🔬', '🎨', '📱', '⚡'];
+   166→
+   167→// ─── Hero / Landing View ──────────────────────────────────────
+   168→
+   169→function HeroView({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
+   170→  const { locale } = useAppStore();
+   171→  const isRTL = locale === 'ar';
+   172→
+   173→  const features = [
+   174→    { icon: Zap, title: t('hero.feature.providers', locale), desc: t('hero.feature.providers.desc', locale), accent: 'text-cyan-400' },
+   175→    { icon: Bot, title: t('hero.feature.agents', locale), desc: t('hero.feature.agents.desc', locale), accent: 'text-emerald-400' },
+   176→    { icon: Brain, title: t('hero.feature.memory', locale), desc: t('hero.feature.memory.desc', locale), accent: 'text-amber-400' },
+   177→    { icon: Shield, title: t('hero.feature.security', locale), desc: t('hero.feature.security.desc', locale), accent: 'text-rose-400' },
+   178→  ];
+   179→
+   180→  return (
+   181→    <div className={cn('min-h-screen flex flex-col relative', isRTL && 'rtl')} dir={isRTL ? 'rtl' : 'ltr'}>
+   182→      {/* Animated gradient orbs */}
+   183→      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+   184→        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" />
+   185→        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl animate-pulse [animation-delay:1s]" />
+   186→      </div>
+   187→
+   188→      {/* Nav */}
+   189→      <header className="flex items-center justify-between px-6 py-4 md:px-12 lg:px-20">
+   190→        <div className="flex items-center gap-2">
+   191→          <div className="h-8 w-8 rounded-lg bg-cyan-500 flex items-center justify-center font-bold text-white text-sm">M</div>
+   192→          <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
+   193→            {t('brand.name', locale)}
+   194→          </span>
+   195→        </div>
+   196→        <div className="flex items-center gap-3">
+   197→          <Button variant="ghost" onClick={onLogin} className="text-muted-foreground hover:text-foreground">
+   198→            {t('hero.cta.login', locale)}
+   199→          </Button>
+   200→          <Button onClick={onRegister} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+   201→            {t('hero.cta.register', locale)}
+   202→          </Button>
+   203→        </div>
+   204→      </header>
+   205→
+   206→      {/* Hero Section */}
+   207→      <main className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
+   208→        <div className="text-center max-w-4xl mx-auto animate-in fade-in duration-700">
+   209→          <Badge variant="outline" className="mb-6 border-cyan-500/30 text-cyan-400 bg-cyan-500/10 px-4 py-1.5">
+   210→            v1.0 — Now Available
+   211→          </Badge>
+   212→          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6">
+   213→            <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
+   214→              {t('brand.name', locale)}
+   215→            </span>
+   216→          </h1>
+   217→          <p className="text-xl md:text-2xl text-muted-foreground font-medium mb-4">
+   218→            {t('brand.tagline', locale)}
+   219→          </p>
+   220→          <p className="text-base md:text-lg text-muted-foreground/70 max-w-2xl mx-auto mb-10">
+   221→            {t('brand.description', locale)}
+   222→          </p>
+   223→          <div className="flex items-center justify-center gap-4">
+   224→            <Button size="lg" onClick={onRegister} className="bg-cyan-600 hover:bg-cyan-700 text-white h-12 px-8 text-base">
+   225→              {t('hero.cta.register', locale)}
+   226→            </Button>
+   227→            <Button size="lg" variant="outline" onClick={onLogin} className="h-12 px-8 text-base border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10">
+   228→              {t('hero.cta.login', locale)}
+   229→            </Button>
+   230→          </div>
+   231→        </div>
+   232→
+   233→        {/* Feature Cards */}
+   234→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-16 w-full max-w-5xl">
+   235→          {features.map((feature, i) => (
+   236→            <Card key={i} className="bg-card/50 backdrop-blur border-border/50 hover:border-cyan-500/30 transition-all duration-300 h-full animate-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 100}ms`, animationFillMode: 'both' }}>
+   237→              <CardHeader className="pb-3">
+   238→                <feature.icon className={cn('h-8 w-8', feature.accent)} />
+   239→                <CardTitle className="text-base mt-2">{feature.title}</CardTitle>
+   240→              </CardHeader>
+   241→              <CardContent>
+   242→                <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
+   243→              </CardContent>
+   244→            </Card>
+   245→          ))}
+   246→        </div>
+   247→      </main>
+   248→    </div>
+   249→  );
+   250→}
+   251→
+   252→// ─── Login Dialog ─────────────────────────────────────────────
+   253→
+   254→function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+   255→  const { locale, setUser } = useAppStore();
+   256→  const [email, setEmail] = useState('');
+   257→  const [password, setPassword] = useState('');
+   258→  const [showPassword, setShowPassword] = useState(false);
+   259→  const [rememberMe, setRememberMe] = useState(false);
+   260→  const [loading, setLoading] = useState(false);
+   261→  const [error, setError] = useState('');
+   262→
+   263→  const handleSubmit = async (e: React.FormEvent) => {
+   264→    e.preventDefault();
+   265→    setError('');
+   266→    setLoading(true);
+   267→    try {
+   268→      const res = await fetch('/api/v1/auth/login', {
+   269→        method: 'POST',
+   270→        headers: { 'Content-Type': 'application/json' },
+   271→        body: JSON.stringify({ email, password, rememberMe }),
+   272→      });
+   273→      const data = await res.json();
+   274→      if (!data.success) {
+   275→        setError(data.error || t('common.error', locale));
+   276→        return;
+   277→      }
+   278→      setUser(
+   279→        {
+   280→          id: data.data.user.id,
+   281→          email: data.data.user.email,
+   282→          name: data.data.user.name,
+   283→          avatarUrl: data.data.user.avatarUrl,
+   284→          isSuperAdmin: data.data.user.isSuperAdmin,
+   285→          preferredLocale: data.data.user.preferredLocale || 'en',
+   286→        },
+   287→        data.data.token
+   288→      );
+   289→      onOpenChange(false);
+   290→      setEmail('');
+   291→      setPassword('');
+   292→    } catch {
+   293→      setError(t('common.error', locale));
+   294→    } finally {
+   295→      setLoading(false);
+   296→    }
+   297→  };
+   298→
+   299→  return (
+   300→    <Dialog open={open} onOpenChange={onOpenChange}>
+   301→      <DialogContent className="sm:max-w-md">
+   302→        <DialogHeader>
+   303→          <DialogTitle className="text-xl">{t('auth.login', locale)}</DialogTitle>
+   304→          <DialogDescription>{t('brand.tagline', locale)}</DialogDescription>
+   305→        </DialogHeader>
+   306→        <form onSubmit={handleSubmit} className="space-y-4">
+   307→          {error && (
+   308→            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+   309→              <span className="shrink-0">⚠</span>
+   310→              {error}
+   311→            </div>
+   312→          )}
+   313→          <div className="space-y-2">
+   314→            <Label htmlFor="login-email">{t('auth.email', locale)}</Label>
+   315→            <Input id="login-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+   316→          </div>
+   317→          <div className="space-y-2">
+   318→            <Label htmlFor="login-password">{t('auth.password', locale)}</Label>
+   319→            <div className="relative">
+   320→              <Input id="login-password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="current-password" className="pr-10" />
+   321→              <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
+   322→                {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+   323→              </Button>
+   324→            </div>
+   325→          </div>
+   326→          <div className="flex items-center justify-between">
+   327→            <div className="flex items-center space-x-2">
+   328→              <Checkbox id="remember" checked={rememberMe} onCheckedChange={(v) => setRememberMe(v === true)} />
+   329→              <Label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">{t('auth.rememberMe', locale)}</Label>
+   330→            </div>
+   331→            <Button variant="link" className="px-0 text-cyan-500" type="button">{t('auth.forgotPassword', locale)}</Button>
+   332→          </div>
+   333→          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" disabled={loading}>
+   334→            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   335→            {t('auth.signIn', locale)}
+   336→          </Button>
+   337→        </form>
+   338→      </DialogContent>
+   339→    </Dialog>
+   340→  );
+   341→}
+   342→
+   343→// ─── Register Dialog ──────────────────────────────────────────
+   344→
+   345→function RegisterDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+   346→  const { locale, setUser } = useAppStore();
+   347→  const [name, setName] = useState('');
+   348→  const [email, setEmail] = useState('');
+   349→  const [password, setPassword] = useState('');
+   350→  const [confirmPassword, setConfirmPassword] = useState('');
+   351→  const [selectedLocale, setSelectedLocale] = useState(locale);
+   352→  const [showPassword, setShowPassword] = useState(false);
+   353→  const [loading, setLoading] = useState(false);
+   354→  const [error, setError] = useState('');
+   355→
+   356→  const handleSubmit = async (e: React.FormEvent) => {
+   357→    e.preventDefault();
+   358→    setError('');
+   359→    if (password !== confirmPassword) {
+   360→      setError(locale === 'ar' ? 'كلمات المرور غير متطابقة' : 'Passwords do not match');
+   361→      return;
+   362→    }
+   363→    setLoading(true);
+   364→    try {
+   365→      const res = await fetch('/api/v1/auth/register', {
+   366→        method: 'POST',
+   367→        headers: { 'Content-Type': 'application/json' },
+   368→        body: JSON.stringify({ name, email, password, confirmPassword, locale: selectedLocale }),
+   369→      });
+   370→      const data = await res.json();
+   371→      if (!data.success) {
+   372→        setError(data.error || t('common.error', locale));
+   373→        return;
+   374→      }
+   375→      setUser(
+   376→        {
+   377→          id: data.data.user.id,
+   378→          email: data.data.user.email,
+   379→          name: data.data.user.name,
+   380→          avatarUrl: data.data.user.avatarUrl,
+   381→          isSuperAdmin: data.data.user.isSuperAdmin,
+   382→          preferredLocale: data.data.user.preferredLocale || selectedLocale,
+   383→        },
+   384→        data.data.token
+   385→      );
+   386→      onOpenChange(false);
+   387→      setName(''); setEmail(''); setPassword(''); setConfirmPassword('');
+   388→    } catch {
+   389→      setError(t('common.error', locale));
+   390→    } finally {
+   391→      setLoading(false);
+   392→    }
+   393→  };
+   394→
+   395→  return (
+   396→    <Dialog open={open} onOpenChange={onOpenChange}>
+   397→      <DialogContent className="sm:max-w-md">
+   398→        <DialogHeader>
+   399→          <DialogTitle className="text-xl">{t('auth.register', locale)}</DialogTitle>
+   400→          <DialogDescription>{t('brand.tagline', locale)}</DialogDescription>
+   401→        </DialogHeader>
+   402→        <form onSubmit={handleSubmit} className="space-y-4">
+   403→          {error && (
+   404→            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+   405→              <span className="shrink-0">⚠</span>
+   406→              {error}
+   407→            </div>
+   408→          )}
+   409→          <div className="space-y-2">
+   410→            <Label htmlFor="reg-name">{t('auth.name', locale)}</Label>
+   411→            <Input id="reg-name" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
+   412→          </div>
+   413→          <div className="space-y-2">
+   414→            <Label htmlFor="reg-email">{t('auth.email', locale)}</Label>
+   415→            <Input id="reg-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+   416→          </div>
+   417→          <div className="space-y-2">
+   418→            <Label htmlFor="reg-password">{t('auth.password', locale)}</Label>
+   419→            <div className="relative">
+   420→              <Input id="reg-password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} className="pr-10" />
+   421→              <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
+   422→                {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+   423→              </Button>
+   424→            </div>
+   425→            <p className="text-xs text-muted-foreground">{locale === 'ar' ? '8 أحرف على الأقل، يحتوي أحرف كبيرة وصغيرة وأرقام' : 'Min 8 chars with uppercase, lowercase, and number'}</p>
+   426→          </div>
+   427→          <div className="space-y-2">
+   428→            <Label htmlFor="reg-confirm">{t('auth.confirmPassword', locale)}</Label>
+   429→            <Input id="reg-confirm" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+   430→          </div>
+   431→          <div className="space-y-2">
+   432→            <Label>{t('auth.locale', locale)}</Label>
+   433→            <Select value={selectedLocale} onValueChange={(v) => setSelectedLocale(v as 'en' | 'ar')}>
+   434→              <SelectTrigger><SelectValue /></SelectTrigger>
+   435→              <SelectContent>
+   436→                <SelectItem value="en">English</SelectItem>
+   437→                <SelectItem value="ar">العربية</SelectItem>
+   438→              </SelectContent>
+   439→            </Select>
+   440→          </div>
+   441→          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" disabled={loading}>
+   442→            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   443→            {t('auth.signUp', locale)}
+   444→          </Button>
+   445→        </form>
+   446→      </DialogContent>
+   447→    </Dialog>
+   448→  );
+   449→}
+   450→
+   451→// ─── Dashboard View ───────────────────────────────────────────
+   452→
+   453→function DashboardView() {
+   454→  const { user, locale, setActiveTab } = useAppStore();
+   455→
+   456→  const stats = [
+   457→    { label: t('dashboard.organizations', locale), value: '3', Icon: Building2, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+   458→    { label: t('dashboard.projects', locale), value: '4', Icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+   459→    { label: t('dashboard.chats', locale), value: '12', Icon: MessageSquare, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+   460→    { label: t('dashboard.files', locale), value: '28', Icon: Upload, color: 'text-rose-400', bg: 'bg-rose-500/10' },
+   461→  ];
+   462→
+   463→  return (
+   464→    <div className="space-y-6 animate-in fade-in duration-300">
+   465→      {/* Welcome */}
+   466→      <Card className="bg-gradient-to-r from-cyan-600/20 via-teal-600/10 to-transparent border-cyan-500/20">
+   467→        <CardContent className="p-6">
+   468→          <h2 className="text-2xl font-bold">{t('dashboard.welcome', locale)}, {user?.name || user?.email} 👋</h2>
+   469→          <p className="text-muted-foreground mt-1">{t('brand.tagline', locale)}</p>
+   470→        </CardContent>
+   471→      </Card>
+   472→
+   473→      {/* Stats Grid */}
+   474→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   475→        {stats.map((stat, i) => (
+   476→          <Card key={i} className="hover:border-cyan-500/30 transition-colors">
+   477→            <CardContent className="p-4 flex items-center gap-4">
+   478→              <div className={cn('p-2.5 rounded-lg', stat.bg)}>
+   479→                <stat.Icon className={cn('h-5 w-5', stat.color)} />
+   480→              </div>
+   481→              <div>
+   482→                <p className="text-2xl font-bold">{stat.value}</p>
+   483→                <p className="text-xs text-muted-foreground">{stat.label}</p>
+   484→              </div>
+   485→            </CardContent>
+   486→          </Card>
+   487→        ))}
+   488→      </div>
+   489→
+   490→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   491→        {/* Recent Activity */}
+   492→        <Card className="lg:col-span-2">
+   493→          <CardHeader><CardTitle className="text-lg">{t('dashboard.recentActivity', locale)}</CardTitle></CardHeader>
+   494→          <CardContent className="space-y-3">
+   495→            {MOCK_ACTIVITY.map((item) => (
+   496→              <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+   497→                <div className="p-2 rounded-md bg-muted"><item.Icon className="h-4 w-4 text-muted-foreground" /></div>
+   498→                <div className="flex-1 min-w-0">
+   499→                  <p className="text-sm font-medium truncate">{item.action}</p>
+   500→                  <p className="text-xs text-muted-foreground truncate">{item.resource}</p>
+   501→                </div>
+   502→                <span className="text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
+   503→              </div>
+   504→            ))}
+   505→          </CardContent>
+   506→        </Card>
+   507→
+   508→        {/* Quick Actions */}
+   509→        <Card>
+   510→          <CardHeader><CardTitle className="text-lg">{t('dashboard.quickActions', locale)}</CardTitle></CardHeader>
+   511→          <CardContent className="space-y-3">
+   512→            <Button className="w-full justify-start gap-3 bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => setActiveTab('chat')}>
+   513→              <Plus className="h-4 w-4" />{t('dashboard.newChat', locale)}
+   514→            </Button>
+   515→            <Button className="w-full justify-start gap-3" variant="outline" onClick={() => setActiveTab('projects')}>
+   516→              <FolderKanban className="h-4 w-4" />{t('dashboard.newProject', locale)}
+   517→            </Button>
+   518→            <Button className="w-full justify-start gap-3" variant="outline" disabled>
+   519→              <Upload className="h-4 w-4" />{t('dashboard.uploadFile', locale)}
+   520→            </Button>
+   521→          </CardContent>
+   522→        </Card>
+   523→      </div>
+   524→    </div>
+   525→  );
+   526→}
+   527→
+   528→// ─── Chat View ────────────────────────────────────────────────
+   529→
+   530→function ChatView() {
+   531→  const { locale } = useAppStore();
+   532→  const [messages, setMessages] = useState<ChatMessage[]>([]);
+   533→  const [input, setInput] = useState('');
+   534→  const [provider, setProvider] = useState('openai');
+   535→  const [model, setModel] = useState('gpt-4o');
+   536→  const [sending, setSending] = useState(false);
+   537→  const scrollRef = useRef<HTMLDivElement>(null);
+   538→
+   539→  const currentModels = MOCK_MODELS[provider] || [];
+   540→
+   541→  const handleProviderChange = useCallback((newProvider: string) => {
+   542→    setProvider(newProvider);
+   543→    const models = MOCK_MODELS[newProvider];
+   544→    if (models && models.length > 0) {
+   545→      setModel(models[0].value);
+   546→    }
+   547→  }, []);
+   548→
+   549→  useEffect(() => {
+   550→    if (scrollRef.current) {
+   551→      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+   552→    }
+   553→  }, [messages]);
+   554→
+   555→  const handleSend = () => {
+   556→    if (!input.trim() || sending) return;
+   557→    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: input.trim(), timestamp: new Date() };
+   558→    setMessages((prev) => [...prev, userMsg]);
+   559→    setInput('');
+   560→    setSending(true);
+   561→
+   562→    setTimeout(() => {
+   563→      const providerLabel = MOCK_PROVIDERS.find((p) => p.value === provider)?.label || provider;
+   564→      const modelLabel = MOCK_MODELS[provider]?.find((m) => m.value === model)?.label || model;
+   565→      const assistantMsg: ChatMessage = {
+   566→        id: (Date.now() + 1).toString(),
+   567→        role: 'assistant',
+   568→        content: `I'm a simulated response from ${providerLabel} using ${modelLabel}. In production, this would connect to your configured AI provider and generate a real response based on your prompt: "${userMsg.content.substring(0, 100)}${userMsg.content.length > 100 ? '...' : ''}"`,
+   569→        timestamp: new Date(),
+   570→      };
+   571→      setMessages((prev) => [...prev, assistantMsg]);
+   572→      setSending(false);
+   573→    }, 1200);
+   574→  };
+   575→
+   576→  const handleKeyDown = (e: React.KeyboardEvent) => {
+   577→    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+   578→  };
+   579→
+   580→  return (
+   581→    <div className="flex flex-col h-[calc(100vh-5rem)] animate-in fade-in duration-300">
+   582→      {/* Chat Controls */}
+   583→      <div className="flex flex-wrap items-center gap-3 pb-4">
+   584→        <div className="flex items-center gap-2">
+   585→          <Label className="text-sm whitespace-nowrap">{t('chat.provider', locale)}:</Label>
+   586→          <Select value={provider} onValueChange={handleProviderChange}>
+   587→            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+   588→            <SelectContent>
+   589→              {MOCK_PROVIDERS.map((p) => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))}
+   590→            </SelectContent>
+   591→          </Select>
+   592→        </div>
+   593→        <div className="flex items-center gap-2">
+   594→          <Label className="text-sm whitespace-nowrap">{t('chat.model', locale)}:</Label>
+   595→          <Select value={model} onValueChange={setModel}>
+   596→            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+   597→            <SelectContent>
+   598→              {currentModels.map((m) => (<SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>))}
+   599→            </SelectContent>
+   600→          </Select>
+   601→        </div>
+   602→      </div>
+   603→
+   604→      {/* Messages Area */}
+   605→      <Card className="flex-1 flex flex-col min-h-0">
+   606→        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+   607→          {messages.length === 0 ? (
+   608→            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+   609→              <Bot className="h-16 w-16 text-muted-foreground/30 mb-4" />
+   610→              <h3 className="text-lg font-medium text-muted-foreground">{t('chat.title', locale)}</h3>
+   611→              <p className="text-sm text-muted-foreground/60 mt-1 max-w-md">{t('chat.empty', locale)}</p>
+   612→            </div>
+   613→          ) : (
+   614→            <div className="space-y-4 pb-4">
+   615→              {messages.map((msg) => (
+   616→                <div key={msg.id} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+   617→                  <div className={cn('max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed', msg.role === 'user' ? 'bg-cyan-600 text-white rounded-br-md' : 'bg-muted text-foreground rounded-bl-md')}>
+   618→                    {msg.content}
+   619→                  </div>
+   620→                </div>
+   621→              ))}
+   622→              {sending && (
+   623→                <div className="flex justify-start">
+   624→                  <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+   625→                    <div className="flex items-center gap-1.5">
+   626→                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+   627→                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+   628→                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+   629→                    </div>
+   630→                  </div>
+   631→                </div>
+   632→              )}
+   633→            </div>
+   634→          )}
+   635→        </ScrollArea>
+   636→
+   637→        {/* Input Area */}
+   638→        <div className="p-4 border-t border-border">
+   639→          <div className="flex items-end gap-3">
+   640→            <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={t('chat.placeholder', locale)} className="min-h-[44px] max-h-32 resize-none" rows={1} />
+   641→            <Button onClick={handleSend} disabled={!input.trim() || sending} className="bg-cyan-600 hover:bg-cyan-700 text-white shrink-0 h-11 w-11 p-0">
+   642→              <Send className="h-4 w-4" />
+   643→            </Button>
+   644→          </div>
+   645→        </div>
+   646→      </Card>
+   647→    </div>
+   648→  );
+   649→}
+   650→
+   651→// ─── Organizations View ───────────────────────────────────────
+   652→
+   653→function OrganizationsView() {
+   654→  const { locale, token } = useAppStore();
+   655→  const [orgs, setOrgs] = useState(MOCK_ORGS);
+   656→  const [createOpen, setCreateOpen] = useState(false);
+   657→  const [newOrg, setNewOrg] = useState({ name: '', slug: '', description: '' });
+   658→  const [loading, setLoading] = useState(false);
+   659→
+   660→  const handleCreate = async () => {
+   661→    if (!newOrg.name || !newOrg.slug) return;
+   662→    setLoading(true);
+   663→    try {
+   664→      const res = await fetch('/api/v1/organizations', {
+   665→        method: 'POST',
+   666→        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+   667→        body: JSON.stringify(newOrg),
+   668→      });
+   669→      const data = await res.json();
+   670→      if (data.success && data.data) {
+   671→        setOrgs((prev) => [...prev, { id: data.data.id, name: data.data.name, slug: data.data.slug, description: data.data.description || '', members: 1, projects: 0 }]);
+   672→      }
+   673→    } catch {
+   674→      setOrgs((prev) => [...prev, { id: Date.now().toString(), ...newOrg, members: 1, projects: 0 }]);
+   675→    }
+   676→    setCreateOpen(false);
+   677→    setNewOrg({ name: '', slug: '', description: '' });
+   678→    setLoading(false);
+   679→  };
+   680→
+   681→  const slugify = (val: string) => val.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+   682→
+   683→  return (
+   684→    <div className="space-y-6 animate-in fade-in duration-300">
+   685→      <div className="flex items-center justify-between">
+   686→        <h2 className="text-2xl font-bold">{t('org.title', locale)}</h2>
+   687→        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+   688→          <DialogTrigger asChild>
+   689→            <Button className="bg-cyan-600 hover:bg-cyan-700 text-white"><Plus className="h-4 w-4 mr-2" />{t('org.create', locale)}</Button>
+   690→          </DialogTrigger>
+   691→          <DialogContent>
+   692→            <DialogHeader><DialogTitle>{t('org.create', locale)}</DialogTitle></DialogHeader>
+   693→            <div className="space-y-4">
+   694→              <div className="space-y-2">
+   695→                <Label>{t('org.name', locale)}</Label>
+   696→                <Input value={newOrg.name} onChange={(e) => setNewOrg({ ...newOrg, name: e.target.value, slug: slugify(e.target.value) })} placeholder="Acme Corp" />
+   697→              </div>
+   698→              <div className="space-y-2">
+   699→                <Label>{t('org.slug', locale)}</Label>
+   700→                <Input value={newOrg.slug} onChange={(e) => setNewOrg({ ...newOrg, slug: slugify(e.target.value) })} placeholder="acme-corp" />
+   701→              </div>
+   702→              <div className="space-y-2">
+   703→                <Label>{t('org.description', locale)}</Label>
+   704→                <Textarea value={newOrg.description} onChange={(e) => setNewOrg({ ...newOrg, description: e.target.value })} placeholder="Optional description..." />
+   705→              </div>
+   706→              <Button onClick={handleCreate} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" disabled={loading}>
+   707→                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{t('common.create', locale)}
+   708→              </Button>
+   709→            </div>
+   710→          </DialogContent>
+   711→        </Dialog>
+   712→      </div>
+   713→
+   714→      {orgs.length === 0 ? (
+   715→        <Card><CardContent className="p-12 text-center"><Building2 className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" /><p className="text-muted-foreground">{t('org.noOrgs', locale)}</p></CardContent></Card>
+   716→      ) : (
+   717→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   718→          {orgs.map((org) => (
+   719→            <Card key={org.id} className="h-full hover:border-cyan-500/30 transition-all hover:shadow-lg hover:-translate-y-0.5">
+   720→              <CardHeader>
+   721→                <div className="flex items-center gap-3">
+   722→                  <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-cyan-400" /></div>
+   723→                  <div><CardTitle className="text-base">{org.name}</CardTitle><CardDescription className="text-xs">{org.slug}</CardDescription></div>
+   724→                </div>
+   725→              </CardHeader>
+   726→              <CardContent>
+   727→                {org.description && <p className="text-sm text-muted-foreground mb-3">{org.description}</p>}
+   728→                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+   729→                  <div className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{org.members}</div>
+   730→                  <div className="flex items-center gap-1"><FolderKanban className="h-3.5 w-3.5" />{org.projects}</div>
+   731→                </div>
+   732→              </CardContent>
+   733→            </Card>
+   734→          ))}
+   735→        </div>
+   736→      )}
+   737→    </div>
+   738→  );
+   739→}
+   740→
+   741→// ─── Projects View ────────────────────────────────────────────
+   742→
+   743→function ProjectsView() {
+   744→  const { locale } = useAppStore();
+   745→  const [projects, setProjects] = useState(MOCK_PROJECTS);
+   746→  const [createOpen, setCreateOpen] = useState(false);
+   747→  const [newProject, setNewProject] = useState({ name: '', slug: '', description: '', icon: '🚀', color: '#06b6d4' });
+   748→
+   749→  const handleCreate = () => {
+   750→    if (!newProject.name || !newProject.slug) return;
+   751→    setProjects((prev) => [...prev, { id: Date.now().toString(), ...newProject }]);
+   752→    setCreateOpen(false);
+   753→    setNewProject({ name: '', slug: '', description: '', icon: '🚀', color: '#06b6d4' });
+   754→  };
+   755→
+   756→  const slugify = (val: string) => val.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+   757→
+   758→  return (
+   759→    <div className="space-y-6 animate-in fade-in duration-300">
+   760→      <div className="flex items-center justify-between">
+   761→        <h2 className="text-2xl font-bold">{t('project.title', locale)}</h2>
+   762→        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+   763→          <DialogTrigger asChild>
+   764→            <Button className="bg-cyan-600 hover:bg-cyan-700 text-white"><Plus className="h-4 w-4 mr-2" />{t('project.create', locale)}</Button>
+   765→          </DialogTrigger>
+   766→          <DialogContent>
+   767→            <DialogHeader><DialogTitle>{t('project.create', locale)}</DialogTitle></DialogHeader>
+   768→            <div className="space-y-4">
+   769→              <div className="space-y-2">
+   770→                <Label>{t('project.name', locale)}</Label>
+   771→                <Input value={newProject.name} onChange={(e) => setNewProject({ ...newProject, name: e.target.value, slug: slugify(e.target.value) })} placeholder="My Project" />
+   772→              </div>
+   773→              <div className="space-y-2">
+   774→                <Label>{t('project.slug', locale)}</Label>
+   775→                <Input value={newProject.slug} onChange={(e) => setNewProject({ ...newProject, slug: slugify(e.target.value) })} placeholder="my-project" />
+   776→              </div>
+   777→              <div className="space-y-2">
+   778→                <Label>{t('project.description', locale)}</Label>
+   779→                <Textarea value={newProject.description} onChange={(e) => setNewProject({ ...newProject, description: e.target.value })} placeholder="Optional description..." />
+   780→              </div>
+   781→              <div className="grid grid-cols-2 gap-4">
+   782→                <div className="space-y-2">
+   783→                  <Label>{t('project.icon', locale)}</Label>
+   784→                  <div className="flex flex-wrap gap-2">
+   785→                    {PROJECT_ICONS.map((icon) => (
+   786→                      <button key={icon} type="button" onClick={() => setNewProject({ ...newProject, icon })} className={cn('h-9 w-9 rounded-lg border text-lg flex items-center justify-center transition-all', newProject.icon === icon ? 'border-cyan-500 bg-cyan-500/10 scale-110' : 'border-border hover:border-cyan-500/50')}>
+   787→                        {icon}
+   788→                      </button>
+   789→                    ))}
+   790→                  </div>
+   791→                </div>
+   792→                <div className="space-y-2">
+   793→                  <Label>{t('project.color', locale)}</Label>
+   794→                  <div className="flex flex-wrap gap-2">
+   795→                    {PROJECT_COLORS.map((color) => (
+   796→                      <button key={color} type="button" onClick={() => setNewProject({ ...newProject, color })} className={cn('h-9 w-9 rounded-lg border-2 transition-all', newProject.color === color ? 'scale-110 ring-2 ring-offset-2 ring-offset-background' : 'border-transparent')} style={{ backgroundColor: color }} />
+   797→                    ))}
+   798→                  </div>
+   799→                </div>
+   800→              </div>
+   801→              <Button onClick={handleCreate} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white">{t('common.create', locale)}</Button>
+   802→            </div>
+   803→          </DialogContent>
+   804→        </Dialog>
+   805→      </div>
+   806→
+   807→      {projects.length === 0 ? (
+   808→        <Card><CardContent className="p-12 text-center"><FolderKanban className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" /><p className="text-muted-foreground">{t('project.noProjects', locale)}</p></CardContent></Card>
+   809→      ) : (
+   810→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   811→          {projects.map((project) => (
+   812→            <Card key={project.id} className="h-full hover:border-cyan-500/30 transition-all hover:shadow-lg hover:-translate-y-0.5 overflow-hidden">
+   813→              <div className="h-1.5" style={{ backgroundColor: project.color }} />
+   814→              <CardHeader>
+   815→                <div className="flex items-center gap-3">
+   816→                  <span className="text-2xl">{project.icon}</span>
+   817→                  <div><CardTitle className="text-base">{project.name}</CardTitle><CardDescription className="text-xs">{project.slug}</CardDescription></div>
+   818→                </div>
+   819→              </CardHeader>
+   820→              <CardContent>{project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}</CardContent>
+   821→            </Card>
+   822→          ))}
+   823→        </div>
+   824→      )}
+   825→    </div>
+   826→  );
+   827→}
+   828→
+   829→// ─── Settings View ────────────────────────────────────────────
+   830→
+   831→function SettingsView() {
+   832→  const { locale, user, setLocale } = useAppStore();
+   833→  const [settingsTab, setSettingsTab] = useState('profile');
+   834→  const [emailNotifications, setEmailNotifications] = useState(true);
+   835→  const [pushNotifications, setPushNotifications] = useState(false);
+   836→  const [weeklyDigest, setWeeklyDigest] = useState(true);
+   837→
+   838→  return (
+   839→    <div className="space-y-6 animate-in fade-in duration-300">
+   840→      <h2 className="text-2xl font-bold">{t('settings.title', locale)}</h2>
+   841→      <Tabs value={settingsTab} onValueChange={setSettingsTab}>
+   842→        <TabsList className="grid w-full grid-cols-4">
+   843→          <TabsTrigger value="profile" className="text-xs sm:text-sm"><Settings className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />{t('settings.profile', locale)}</TabsTrigger>
+   844→          <TabsTrigger value="security" className="text-xs sm:text-sm"><Lock className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />{t('settings.security', locale)}</TabsTrigger>
+   845→          <TabsTrigger value="apikeys" className="text-xs sm:text-sm"><Key className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />{t('settings.apiKeys', locale)}</TabsTrigger>
+   846→          <TabsTrigger value="notifications" className="text-xs sm:text-sm"><Bell className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" />{t('settings.notifications', locale)}</TabsTrigger>
+   847→        </TabsList>
+   848→
+   849→        <TabsContent value="profile" className="mt-6">
+   850→          <Card>
+   851→            <CardHeader><CardTitle>{t('settings.profile', locale)}</CardTitle></CardHeader>
+   852→            <CardContent className="space-y-4">
+   853→              <div className="flex items-center gap-4 pb-4">
+   854→                <Avatar className="h-16 w-16">
+   855→                  <AvatarImage src={user?.avatarUrl || undefined} />
+   856→                  <AvatarFallback className="bg-cyan-500/10 text-cyan-400 text-xl">{(user?.name || user?.email || 'U')[0].toUpperCase()}</AvatarFallback>
+   857→                </Avatar>
+   858→                <div><p className="font-medium">{user?.name || 'User'}</p><p className="text-sm text-muted-foreground">{user?.email}</p></div>
+   859→              </div>
+   860→              <Separator />
+   861→              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   862→                <div className="space-y-2"><Label>{t('settings.profileName', locale)}</Label><Input defaultValue={user?.name || ''} placeholder="Your name" /></div>
+   863→                <div className="space-y-2"><Label>{t('settings.profileEmail', locale)}</Label><Input defaultValue={user?.email || ''} disabled /></div>
+   864→                <div className="space-y-2">
+   865→                  <Label>{t('settings.profileLocale', locale)}</Label>
+   866→                  <Select value={locale} onValueChange={(v) => setLocale(v as 'en' | 'ar')}>
+   867→                    <SelectTrigger><SelectValue /></SelectTrigger>
+   868→                    <SelectContent><SelectItem value="en">English</SelectItem><SelectItem value="ar">العربية</SelectItem></SelectContent>
+   869→                  </Select>
+   870→                </div>
+   871→                <div className="space-y-2">
+   872→                  <Label>{t('settings.profileTimezone', locale)}</Label>
+   873→                  <Select defaultValue="UTC">
+   874→                    <SelectTrigger><SelectValue /></SelectTrigger>
+   875→                    <SelectContent>
+   876→                      <SelectItem value="UTC">UTC</SelectItem>
+   877→                      <SelectItem value="America/New_York">Eastern Time</SelectItem>
+   878→                      <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+   879→                      <SelectItem value="Europe/London">London</SelectItem>
+   880→                      <SelectItem value="Asia/Riyadh">Riyadh</SelectItem>
+   881→                      <SelectItem value="Asia/Dubai">Dubai</SelectItem>
+   882→                    </SelectContent>
+   883→                  </Select>
+   884→                </div>
+   885→              </div>
+   886→              <Button className="bg-cyan-600 hover:bg-cyan-700 text-white mt-2">{t('common.save', locale)}</Button>
+   887→            </CardContent>
+   888→          </Card>
+   889→        </TabsContent>
+   890→
+   891→        <TabsContent value="security" className="mt-6">
+   892→          <div className="space-y-6">
+   893→            <Card>
+   894→              <CardHeader><CardTitle>{t('settings.changePassword', locale)}</CardTitle></CardHeader>
+   895→              <CardContent className="space-y-4">
+   896→                <div className="space-y-2"><Label>{t('settings.currentPassword', locale)}</Label><Input type="password" /></div>
+   897→                <div className="space-y-2"><Label>{t('settings.newPassword', locale)}</Label><Input type="password" /></div>
+   898→                <div className="space-y-2"><Label>{t('settings.confirmNewPassword', locale)}</Label><Input type="password" /></div>
+   899→                <Button className="bg-cyan-600 hover:bg-cyan-700 text-white">{t('settings.changePassword', locale)}</Button>
+   900→              </CardContent>
+   901→            </Card>
+   902→            <Card>
+   903→              <CardHeader><CardTitle>{t('settings.activeSessions', locale)}</CardTitle></CardHeader>
+   904→              <CardContent>
+   905→                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+   906→                  <div className="flex items-center gap-3">
+   907→                    <div className="p-2 rounded-md bg-cyan-500/10"><Activity className="h-4 w-4 text-cyan-400" /></div>
+   908→                    <div><p className="text-sm font-medium">Current Session</p><p className="text-xs text-muted-foreground">Chrome · {new Date().toLocaleDateString()}</p></div>
+   909→                  </div>
+   910→                  <Badge variant="outline" className="text-emerald-400 border-emerald-400/30 bg-emerald-400/10">Active</Badge>
+   911→                </div>
+   912→              </CardContent>
+   913→            </Card>
+   914→          </div>
+   915→        </TabsContent>
+   916→
+   917→        <TabsContent value="apikeys" className="mt-6">
+   918→          <Card>
+   919→            <CardHeader className="flex flex-row items-center justify-between">
+   920→              <CardTitle>{t('settings.apiKeys', locale)}</CardTitle>
+   921→              <Button className="bg-cyan-600 hover:bg-cyan-700 text-white" size="sm"><Plus className="h-3.5 w-3.5 mr-1.5" />{t('settings.createApiKey', locale)}</Button>
+   922→            </CardHeader>
+   923→            <CardContent className="space-y-3">
+   924→              {[
+   925→                { name: 'Production Key', prefix: 'mz_a8f3...d921', color: 'text-amber-400' },
+   926→                { name: 'Development Key', prefix: 'mz_b2c7...e4f8', color: 'text-cyan-400' },
+   927→              ].map((key, i) => (
+   928→                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+   929→                  <div className="flex items-center gap-3">
+   930→                    <Key className={cn('h-4 w-4', key.color)} />
+   931→                    <div><p className="text-sm font-medium">{key.name}</p><p className="text-xs text-muted-foreground font-mono">{key.prefix}</p></div>
+   932→                  </div>
+   933→                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">{t('settings.revoke', locale)}</Button>
+   934→                </div>
+   935→              ))}
+   936→            </CardContent>
+   937→          </Card>
+   938→        </TabsContent>
+   939→
+   940→        <TabsContent value="notifications" className="mt-6">
+   941→          <Card>
+   942→            <CardHeader><CardTitle>{t('settings.notifications', locale)}</CardTitle></CardHeader>
+   943→            <CardContent className="space-y-6">
+   944→              <div className="flex items-center justify-between">
+   945→                <div><p className="text-sm font-medium">{t('settings.emailNotifications', locale)}</p><p className="text-xs text-muted-foreground">Receive email updates</p></div>
+   946→                <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+   947→              </div>
+   948→              <Separator />
+   949→              <div className="flex items-center justify-between">
+   950→                <div><p className="text-sm font-medium">{t('settings.pushNotifications', locale)}</p><p className="text-xs text-muted-foreground">Push notifications for real-time alerts</p></div>
+   951→                <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
+   952→              </div>
+   953→              <Separator />
+   954→              <div className="flex items-center justify-between">
+   955→                <div><p className="text-sm font-medium">{t('settings.weeklyDigest', locale)}</p><p className="text-xs text-muted-foreground">Weekly summary of your activity</p></div>
+   956→                <Switch checked={weeklyDigest} onCheckedChange={setWeeklyDigest} />
+   957→              </div>
+   958→            </CardContent>
+   959→          </Card>
+   960→        </TabsContent>
+   961→      </Tabs>
+   962→    </div>
+   963→  );
+   964→}
+   965→
+   966→// ─── Admin View ───────────────────────────────────────────────
+   967→
+   968→function AdminView() {
+   969→  const { locale } = useAppStore();
+   970→  const [adminTab, setAdminTab] = useState('flags');
+   971→  const [systemHealth, setSystemHealth] = useState<{ status: string; database: string; version: string } | null>(null);
+   972→  const [healthLoading, setHealthLoading] = useState(false);
+   973→
+   974→  const checkHealth = useCallback(async () => {
+   975→    setHealthLoading(true);
+   976→    try {
+   977→      const res = await fetch('/api/v1/health');
+   978→      const data = await res.json();
+   979→      if (data.success) {
+   980→        setSystemHealth({ status: data.data.status, database: data.data.database, version: data.data.version });
+   981→      }
+   982→    } catch {
+   983→      setSystemHealth({ status: 'error', database: 'disconnected', version: '—' });
+   984→    } finally {
+   985→      setHealthLoading(false);
+   986→    }
+   987→  }, []);
+   988→
+   989→  useEffect(() => { checkHealth(); }, [checkHealth]);
+   990→
+   991→  return (
+   992→    <div className="space-y-6 animate-in fade-in duration-300">
+   993→      <h2 className="text-2xl font-bold">{t('admin.title', locale)}</h2>
+   994→      <Tabs value={adminTab} onValueChange={setAdminTab}>
+   995→        <TabsList>
+   996→          <TabsTrigger value="flags"><Flag className="h-3.5 w-3.5 mr-1.5" />{t('admin.featureFlags', locale)}</TabsTrigger>
+   997→          <TabsTrigger value="audit"><FileText className="h-3.5 w-3.5 mr-1.5" />{t('admin.auditLog', locale)}</TabsTrigger>
+   998→          <TabsTrigger value="health"><Activity className="h-3.5 w-3.5 mr-1.5" />{t('admin.systemHealth', locale)}</TabsTrigger>
+   999→        </TabsList>
+  1000→
+  1001→        <TabsContent value="flags" className="mt-6">
+  1002→          <Card>
+  1003→            <CardHeader><CardTitle>{t('admin.featureFlags', locale)}</CardTitle></CardHeader>
+  1004→            <CardContent className="space-y-3">
+  1005→              {MOCK_FEATURE_FLAGS.map((flag) => (
+  1006→                <div key={flag.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+  1007→                  <div><p className="text-sm font-medium">{flag.name}</p><p className="text-xs text-muted-foreground font-mono">{flag.key}</p></div>
+  1008→                  <div className="flex items-center gap-3">
+  1009→                    <Badge variant="outline" className="text-xs">{flag.type}</Badge>
+  1010→                    <Badge variant="outline" className="text-xs font-mono">{flag.value}</Badge>
+  1011→                    <Badge variant="outline" className={cn('text-xs', flag.isActive ? 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10' : 'text-muted-foreground')}>
+  1012→                      {flag.isActive ? (locale === 'ar' ? 'نشط' : 'Active') : (locale === 'ar' ? 'معطل' : 'Inactive')}
+  1013→                    </Badge>
+  1014→                  </div>
+  1015→                </div>
+  1016→              ))}
+  1017→            </CardContent>
+  1018→          </Card>
+  1019→        </TabsContent>
+  1020→
+  1021→        <TabsContent value="audit" className="mt-6">
+  1022→          <Card>
+  1023→            <CardHeader><CardTitle>{t('admin.auditLog', locale)}</CardTitle></CardHeader>
+  1024→            <CardContent className="space-y-2">
+  1025→              {MOCK_AUDIT_LOG.map((entry) => (
+  1026→                <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+  1027→                  <div className="flex items-center gap-3">
+  1028→                    <Badge variant="outline" className={cn('text-xs min-w-[80px] justify-center', entry.action === 'LOGIN' || entry.action === 'CREATE' ? 'text-emerald-400 border-emerald-400/30' : entry.action === 'DELETE' ? 'text-destructive border-destructive/30' : 'text-amber-400 border-amber-400/30')}>
+  1029→                      {entry.action}
+  1030→                    </Badge>
+  1031→                    <div><p className="text-sm">{entry.resource}</p><p className="text-xs text-muted-foreground">{entry.user}</p></div>
+  1032→                  </div>
+  1033→                  <span className="text-xs text-muted-foreground">{entry.date}</span>
+  1034→                </div>
+  1035→              ))}
+  1036→            </CardContent>
+  1037→          </Card>
+  1038→        </TabsContent>
+  1039→
+  1040→        <TabsContent value="health" className="mt-6">
+  1041→          <Card>
+  1042→            <CardHeader><CardTitle>{t('admin.systemHealth', locale)}</CardTitle></CardHeader>
+  1043→            <CardContent className="space-y-4">
+  1044→              {healthLoading && !systemHealth ? (
+  1045→                <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{t('common.loading', locale)}</div>
+  1046→              ) : systemHealth ? (
+  1047→                <>
+  1048→                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+  1049→                    <span className="text-sm">{t('admin.healthStatus', locale)}</span>
+  1050→                    <Badge variant="outline" className={cn('text-xs', systemHealth.status === 'ok' ? 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10' : 'text-destructive border-destructive/30')}>
+  1051→                      {systemHealth.status === 'ok' ? '✓ Healthy' : '✗ Error'}
+  1052→                    </Badge>
+  1053→                  </div>
+  1054→                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+  1055→                    <span className="text-sm">{t('admin.healthDatabase', locale)}</span>
+  1056→                    <Badge variant="outline" className={cn('text-xs', systemHealth.database === 'connected' ? 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10' : 'text-destructive border-destructive/30')}>
+  1057→                      {systemHealth.database === 'connected' ? '✓ Connected' : '✗ Disconnected'}
+  1058→                    </Badge>
+  1059→                  </div>
+  1060→                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+  1061→                    <span className="text-sm">{t('admin.healthVersion', locale)}</span>
+  1062→                    <Badge variant="outline" className="text-xs">v{systemHealth.version}</Badge>
+  1063→                  </div>
+  1064→                  <div className="pt-2">
+  1065→                    <Button variant="outline" size="sm" onClick={checkHealth} disabled={healthLoading}>
+  1066→                      {healthLoading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Activity className="h-3.5 w-3.5 mr-1.5" />}Refresh
+  1067→                    </Button>
+  1068→                  </div>
+  1069→                </>
+  1070→              ) : null}
+  1071→            </CardContent>
+  1072→          </Card>
+  1073→        </TabsContent>
+  1074→      </Tabs>
+  1075→    </div>
+  1076→  );
+  1077→}
+  1078→
+  1079→// ─── AI Gateway View ──────────────────────────────────────────
+  1080→
+  1081→type GatewayProviderColor = 'emerald' | 'purple' | 'blue' | 'orange' | 'gray' | 'yellow';
+  1082→type GatewayProviderStatus = 'healthy' | 'degraded' | 'unhealthy';
+  1083→
+  1084→interface GatewayProvider {
+  1085→  type: string;
+  1086→  name: string;
+  1087→  icon: string;
+  1088→  color: GatewayProviderColor;
+  1089→}
+  1090→
+  1091→const GATEWAY_PROVIDERS: GatewayProvider[] = [
+  1092→  { type: 'OPENAI', name: 'OpenAI', icon: '🟢', color: 'emerald' },
+  1093→  { type: 'ANTHROPIC', name: 'Anthropic Claude', icon: '🟣', color: 'purple' },
+  1094→  { type: 'GEMINI', name: 'Google Gemini', icon: '🔵', color: 'blue' },
+  1095→  { type: 'DEEPSEEK', name: 'DeepSeek', icon: '🔵', color: 'blue' },
+  1096→  { type: 'GROQ', name: 'Groq', icon: '🟠', color: 'orange' },
+  1097→  { type: 'MISTRAL', name: 'Mistral', icon: '🟠', color: 'orange' },
+  1098→  { type: 'OPENROUTER', name: 'OpenRouter', icon: '⚫', color: 'gray' },
+  1099→  { type: 'NVIDIA_NIM', name: 'NVIDIA NIM', icon: '🟢', color: 'emerald' },
+  1100→  { type: 'HUGGING_FACE', name: 'Hugging Face', icon: '🟡', color: 'yellow' },
+  1101→  { type: 'COHERE', name: 'Cohere', icon: '🟣', color: 'purple' },
+  1102→  { type: 'AZURE_OPENAI', name: 'Azure OpenAI', icon: '🔵', color: 'blue' },
+  1103→  { type: 'OLLAMA', name: 'Ollama (Local)', icon: '🦙', color: 'orange' },
+  1104→];
+  1105→
+  1106→interface GatewayModel {
+  1107→  id: string;
+  1108→  provider: string;
+  1109→  name: string;
+  1110→  context: number;
+  1111→  vision: boolean;
+  1112→  tools: boolean;
+  1113→  json: boolean;
+  1114→  streaming: boolean;
+  1115→  inputCost: number;
+  1116→  outputCost: number;
+  1117→  status: string;
+  1118→}
+  1119→
+  1120→const GATEWAY_MODELS: GatewayModel[] = [
+  1121→  { id: 'gpt-4o', provider: 'OPENAI', name: 'GPT-4o', context: 128000, vision: true, tools: true, json: true, streaming: true, inputCost: 0.0025, outputCost: 0.01, status: 'active' },
+  1122→  { id: 'gpt-4o-mini', provider: 'OPENAI', name: 'GPT-4o Mini', context: 128000, vision: true, tools: true, json: true, streaming: true, inputCost: 0.00015, outputCost: 0.0006, status: 'active' },
+  1123→  { id: 'claude-3-5-sonnet-20241022', provider: 'ANTHROPIC', name: 'Claude 3.5 Sonnet', context: 200000, vision: true, tools: true, json: false, streaming: true, inputCost: 0.003, outputCost: 0.015, status: 'active' },
+  1124→  { id: 'claude-3-5-haiku-20241022', provider: 'ANTHROPIC', name: 'Claude 3.5 Haiku', context: 200000, vision: true, tools: true, json: false, streaming: true, inputCost: 0.0008, outputCost: 0.004, status: 'active' },
+  1125→  { id: 'gemini-1.5-pro', provider: 'GEMINI', name: 'Gemini 1.5 Pro', context: 2000000, vision: true, tools: true, json: true, streaming: true, inputCost: 0.00125, outputCost: 0.005, status: 'active' },
+  1126→  { id: 'gemini-1.5-flash', provider: 'GEMINI', name: 'Gemini 1.5 Flash', context: 1000000, vision: true, tools: true, json: true, streaming: true, inputCost: 0.000075, outputCost: 0.0003, status: 'active' },
+  1127→  { id: 'deepseek-chat', provider: 'DEEPSEEK', name: 'DeepSeek Chat', context: 64000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.00014, outputCost: 0.00028, status: 'active' },
+  1128→  { id: 'deepseek-reasoner', provider: 'DEEPSEEK', name: 'DeepSeek Reasoner', context: 64000, vision: false, tools: false, json: false, streaming: true, inputCost: 0.00055, outputCost: 0.00219, status: 'active' },
+  1129→  { id: 'llama-3.3-70b-versatile', provider: 'GROQ', name: 'Llama 3.3 70B', context: 128000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.00059, outputCost: 0.00079, status: 'active' },
+  1130→  { id: 'mixtral-8x7b-32768', provider: 'GROQ', name: 'Mixtral 8x7B', context: 32768, vision: false, tools: true, json: true, streaming: true, inputCost: 0.00024, outputCost: 0.00024, status: 'active' },
+  1131→  { id: 'mistral-large-latest', provider: 'MISTRAL', name: 'Mistral Large', context: 128000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.002, outputCost: 0.006, status: 'active' },
+  1132→  { id: 'mistral-small-latest', provider: 'MISTRAL', name: 'Mistral Small', context: 32000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.0002, outputCost: 0.0006, status: 'active' },
+  1133→  { id: 'command-r-plus', provider: 'COHERE', name: 'Command R+', context: 128000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.0025, outputCost: 0.01, status: 'active' },
+  1134→  { id: 'llama3.3', provider: 'OLLAMA', name: 'Llama 3.3 (Local)', context: 128000, vision: false, tools: true, json: true, streaming: true, inputCost: 0, outputCost: 0, status: 'active' },
+  1135→  { id: 'gpt-4o-azure', provider: 'AZURE_OPENAI', name: 'GPT-4o (Azure)', context: 128000, vision: true, tools: true, json: true, streaming: true, inputCost: 0.0025, outputCost: 0.01, status: 'active' },
+  1136→  { id: 'meta-llama-3.1-405b', provider: 'NVIDIA_NIM', name: 'Llama 3.1 405B', context: 128000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.0007, outputCost: 0.0008, status: 'active' },
+  1137→  { id: 'meta-llama-3.1-70b', provider: 'HUGGING_FACE', name: 'Llama 3.1 70B', context: 128000, vision: false, tools: false, json: false, streaming: true, inputCost: 0.0001, outputCost: 0.0001, status: 'active' },
+  1138→  { id: 'openrouter-auto', provider: 'OPENROUTER', name: 'Auto Router', context: 128000, vision: false, tools: true, json: true, streaming: true, inputCost: 0.001, outputCost: 0.002, status: 'active' },
+  1139→];
+  1140→
+  1141→interface GatewayProviderHealth extends GatewayProvider {
+  1142→  status: GatewayProviderStatus;
+  1143→  latency: number;
+  1144→  lastChecked: string;
+  1145→  requests: number;
+  1146→  errors: number;
+  1147→}
+  1148→
+  1149→const GATEWAY_PROVIDER_HEALTH: GatewayProviderHealth[] = GATEWAY_PROVIDERS.map((p, i) => {
+  1150→  const status: GatewayProviderStatus = i === 3 ? 'degraded' : i === 8 ? 'unhealthy' : 'healthy';
+  1151→  const latency = i === 3 ? 1240 : i === 8 ? 0 : 80 + ((i * 37) % 400);
+  1152→  return {
+  1153→    ...p,
+  1154→    status,
+  1155→    latency,
+  1156→    lastChecked: `${1 + (i % 5)} min ago`,
+  1157→    requests: 5000 + i * 8423,
+  1158→    errors: i === 8 ? 142 : i === 3 ? 23 : i % 4,
+  1159→  };
+  1160→});
+  1161→
+  1162→interface GatewayApiKey {
+  1163→  id: string;
+  1164→  provider: string;
+  1165→  prefix: string;
+  1166→  label: string;
+  1167→  baseUrl: string;
+  1168→  org: string;
+  1169→  lastUsed: string;
+  1170→  created: string;
+  1171→  status: 'active' | 'inactive';
+  1172→}
+  1173→
+  1174→const GATEWAY_API_KEYS: GatewayApiKey[] = [
+  1175→  { id: '1', provider: 'OPENAI', prefix: 'sk-proj-a8f3...d921', label: 'Production', baseUrl: 'https://api.openai.com/v1', org: 'Acme Corp', lastUsed: '2 min ago', created: '2025-06-12', status: 'active' },
+  1176→  { id: '2', provider: 'ANTHROPIC', prefix: 'sk-ant-b2c7...e4f8', label: 'Anthropic Prod', baseUrl: '', org: 'Acme Corp', lastUsed: '15 min ago', created: '2025-06-10', status: 'active' },
+  1177→  { id: '3', provider: 'GEMINI', prefix: 'AIza-k9d2...m3n4', label: 'Gemini Key', baseUrl: '', org: 'TechVentures', lastUsed: '1 hour ago', created: '2025-06-05', status: 'active' },
+  1178→  { id: '4', provider: 'DEEPSEEK', prefix: 'sk-ds-x7y2...p5q8', label: 'DeepSeek Dev', baseUrl: '', org: 'DataFlow', lastUsed: '3 days ago', created: '2025-05-28', status: 'inactive' },
+  1179→  { id: '5', provider: 'OLLAMA', prefix: 'ollama-local-...0000', label: 'Local', baseUrl: 'http://localhost:11434', org: 'Personal', lastUsed: '5 min ago', created: '2025-06-20', status: 'active' },
+  1180→];
+  1181→
+  1182→const PROVIDER_COLOR_MAP: Record<GatewayProviderColor, { text: string; bg: string; border: string }> = {
+  1183→  emerald: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+  1184→  purple: { text: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' },
+  1185→  blue: { text: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+  1186→  orange: { text: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
+  1187→  gray: { text: 'text-gray-400', bg: 'bg-gray-500/10', border: 'border-gray-500/30' },
+  1188→  yellow: { text: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30' },
+  1189→};
+  1190→
+  1191→const CAP_BADGE_STYLES: Record<'vision' | 'tools' | 'json' | 'streaming', { active: string; inactive: string }> = {
+  1192→  vision: { active: 'text-violet-400 border-violet-400/30 bg-violet-400/10', inactive: 'text-muted-foreground/40 border-muted/30' },
+  1193→  tools: { active: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10', inactive: 'text-muted-foreground/40 border-muted/30' },
+  1194→  json: { active: 'text-amber-400 border-amber-400/30 bg-amber-400/10', inactive: 'text-muted-foreground/40 border-muted/30' },
+  1195→  streaming: { active: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10', inactive: 'text-muted-foreground/40 border-muted/30' },
+  1196→};
+  1197→
+  1198→function formatGatewayNumber(n: number): string {
+  1199→  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
+  1200→  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  1201→  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  1202→  return n.toString();
+  1203→}
+  1204→
+  1205→function formatGatewayContext(n: number): string {
+  1206→  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  1207→  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  1208→  return n.toString();
+  1209→}
+  1210→
+  1211→function formatGatewayCost(n: number): string {
+  1212→  if (n === 0) return 'Free';
+  1213→  return `$${n.toFixed(4)}`;
+  1214→}
+  1215→
+  1216→// ─── Gateway Overview Sub-Tab ─────────────────────────────────
+  1217→
+  1218→function GatewayOverview() {
+  1219→  const [refreshing, setRefreshing] = useState(false);
+  1220→  const [health, setHealth] = useState<GatewayProviderHealth[]>(GATEWAY_PROVIDER_HEALTH);
+  1221→
+  1222→  const handleRefresh = () => {
+  1223→    setRefreshing(true);
+  1224→    setTimeout(() => {
+  1225→      setHealth(GATEWAY_PROVIDER_HEALTH.map((p) => ({ ...p, lastChecked: 'just now' })));
+  1226→      setRefreshing(false);
+  1227→    }, 800);
+  1228→  };
+  1229→
+  1230→  const healthyCount = health.filter((p) => p.status === 'healthy').length;
+  1231→  const degradedCount = health.filter((p) => p.status === 'degraded').length;
+  1232→  const unhealthyCount = health.filter((p) => p.status === 'unhealthy').length;
+  1233→
+  1234→  const summaryStats = [
+  1235→    { label: 'Total Requests', value: '1.28M', sub: '+12.4% this week', Icon: Activity, color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+  1236→    { label: 'Total Tokens', value: '892.5M', sub: '412M in · 480M out', Icon: Hash, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  1237→    { label: 'Total Cost', value: '$1,284.92', sub: 'This month', Icon: DollarSign, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+  1238→    { label: 'Avg Latency', value: '412ms', sub: 'P95: 920ms', Icon: Gauge, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  1239→    { label: 'Success Rate', value: '99.4%', sub: '7,692 errors', Icon: TrendingUp, color: 'text-rose-400', bg: 'bg-rose-500/10' },
+  1240→  ];
+  1241→
+  1242→  const statusConfig: Record<GatewayProviderStatus, { label: string; text: string; bg: string; border: string; dot: string; latencyText: string }> = {
+  1243→    healthy: { label: 'Healthy', text: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/30', dot: 'bg-emerald-400', latencyText: 'text-foreground' },
+  1244→    degraded: { label: 'Degraded', text: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30', dot: 'bg-amber-400', latencyText: 'text-amber-400' },
+  1245→    unhealthy: { label: 'Unhealthy', text: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-400/30', dot: 'bg-rose-400', latencyText: 'text-rose-400' },
+  1246→  };
+  1247→
+  1248→  return (
+  1249→    <div className="space-y-6">
+  1250→      {/* Header row */}
+  1251→      <div className="flex flex-wrap items-center justify-between gap-3">
+  1252→        <div className="flex items-center gap-3 text-sm flex-wrap">
+  1253→          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" />{healthyCount} Healthy</span>
+  1254→          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" />{degradedCount} Degraded</span>
+  1255→          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-400" />{unhealthyCount} Unhealthy</span>
+  1256→        </div>
+  1257→        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+  1258→          {refreshing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+  1259→          Refresh
+  1260→        </Button>
+  1261→      </div>
+  1262→
+  1263→      {/* Summary stats */}
+  1264→      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+  1265→        {summaryStats.map((stat, i) => (
+  1266→          <Card key={i} className="hover:border-cyan-500/30 transition-colors">
+  1267→            <CardContent className="p-4">
+  1268→              <div className="flex items-center justify-between mb-3">
+  1269→                <div className={cn('p-2 rounded-lg', stat.bg)}>
+  1270→                  <stat.Icon className={cn('h-4 w-4', stat.color)} />
+  1271→                </div>
+  1272→              </div>
+  1273→              <p className="text-2xl font-bold">{stat.value}</p>
+  1274→              <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+  1275→              <p className="text-[11px] text-muted-foreground/70 mt-1">{stat.sub}</p>
+  1276→            </CardContent>
+  1277→          </Card>
+  1278→        ))}
+  1279→      </div>
+  1280→
+  1281→      {/* Provider health grid */}
+  1282→      <Card>
+  1283→        <CardHeader>
+  1284→          <CardTitle className="text-lg flex items-center gap-2"><Server className="h-5 w-5 text-cyan-400" />Provider Health</CardTitle>
+  1285→          <CardDescription>Real-time status of all configured AI providers</CardDescription>
+  1286→        </CardHeader>
+  1287→        <CardContent>
+  1288→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+  1289→            {health.map((p) => {
+  1290→              const sc = statusConfig[p.status];
+  1291→              return (
+  1292→                <div key={p.type} className={cn('rounded-lg border p-3 transition-all hover:shadow-md bg-card/50', sc.border)}>
+  1293→                  <div className="flex items-center justify-between mb-2">
+  1294→                    <div className="flex items-center gap-2 min-w-0">
+  1295→                      <span className="text-lg shrink-0">{p.icon}</span>
+  1296→                      <div className="min-w-0">
+  1297→                        <p className="text-sm font-medium truncate">{p.name}</p>
+  1298→                        <p className="text-[10px] text-muted-foreground font-mono uppercase">{p.type}</p>
+  1299→                      </div>
+  1300→                    </div>
+  1301→                    <Badge variant="outline" className={cn('text-[10px] gap-1 shrink-0', sc.text, sc.bg, sc.border)}>
+  1302→                      <span className={cn('h-1.5 w-1.5 rounded-full', sc.dot)} />
+  1303→                      {sc.label}
+  1304→                    </Badge>
+  1305→                  </div>
+  1306→                  <div className="grid grid-cols-3 gap-2 text-[11px] mt-3 pt-2 border-t border-border">
+  1307→                    <div>
+  1308→                      <p className="text-muted-foreground">Latency</p>
+  1309→                      <p className={cn('font-medium', sc.latencyText)}>
+  1310→                        {p.status === 'unhealthy' ? '—' : `${p.latency}ms`}
+  1311→                      </p>
+  1312→                    </div>
+  1313→                    <div>
+  1314→                      <p className="text-muted-foreground">Requests</p>
+  1315→                      <p className="font-medium">{formatGatewayNumber(p.requests)}</p>
+  1316→                    </div>
+  1317→                    <div>
+  1318→                      <p className="text-muted-foreground">Checked</p>
+  1319→                      <p className="font-medium">{p.lastChecked}</p>
+  1320→                    </div>
+  1321→                  </div>
+  1322→                </div>
+  1323→              );
+  1324→            })}
+  1325→          </div>
+  1326→        </CardContent>
+  1327→      </Card>
+  1328→    </div>
+  1329→  );
+  1330→}
+  1331→
+  1332→// ─── Gateway Models Sub-Tab ───────────────────────────────────
+  1333→
+  1334→function CapabilityBadge({ label, active, type }: { label: string; active: boolean; type: 'vision' | 'tools' | 'json' | 'streaming' }) {
+  1335→  const styles = CAP_BADGE_STYLES[type];
+  1336→  return (
+  1337→    <Badge variant="outline" className={cn('text-[10px] gap-1', active ? styles.active : styles.inactive)}>
+  1338→      {active && <span className="h-1 w-1 rounded-full bg-current" />}
+  1339→      {label}
+  1340→    </Badge>
+  1341→  );
+  1342→}
+  1343→
+  1344→function GatewayModels() {
+  1345→  const [search, setSearch] = useState('');
+  1346→  const [providerFilter, setProviderFilter] = useState('all');
+  1347→
+  1348→  const filtered = GATEWAY_MODELS.filter((m) => {
+  1349→    const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) || m.id.toLowerCase().includes(search.toLowerCase());
+  1350→    const matchesProvider = providerFilter === 'all' || m.provider === providerFilter;
+  1351→    return matchesSearch && matchesProvider;
+  1352→  });
+  1353→
+  1354→  return (
+  1355→    <Card>
+  1356→      <CardHeader>
+  1357→        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  1358→          <div>
+  1359→            <CardTitle className="text-lg flex items-center gap-2"><Cpu className="h-5 w-5 text-cyan-400" />Available Models</CardTitle>
+  1360→            <CardDescription>{filtered.length} models across {GATEWAY_PROVIDERS.length} providers</CardDescription>
+  1361→          </div>
+  1362→          <div className="flex flex-col sm:flex-row gap-2">
+  1363→            <div className="relative">
+  1364→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+  1365→              <Input className="w-full sm:w-56 pl-9 h-9" placeholder="Search models..." value={search} onChange={(e) => setSearch(e.target.value)} />
+  1366→            </div>
+  1367→            <Select value={providerFilter} onValueChange={setProviderFilter}>
+  1368→              <SelectTrigger className="w-full sm:w-44 h-9"><SelectValue placeholder="Provider" /></SelectTrigger>
+  1369→              <SelectContent>
+  1370→                <SelectItem value="all">All Providers</SelectItem>
+  1371→                {GATEWAY_PROVIDERS.map((p) => (<SelectItem key={p.type} value={p.type}>{p.name}</SelectItem>))}
+  1372→              </SelectContent>
+  1373→            </Select>
+  1374→          </div>
+  1375→        </div>
+  1376→      </CardHeader>
+  1377→      <CardContent>
+  1378→        <div className="rounded-md border">
+  1379→          <Table>
+  1380→            <TableHeader>
+  1381→              <TableRow className="text-xs text-muted-foreground">
+  1382→                <TableHead>Model</TableHead>
+  1383→                <TableHead>Provider</TableHead>
+  1384→                <TableHead>Context</TableHead>
+  1385→                <TableHead>Capabilities</TableHead>
+  1386→                <TableHead className="text-right">In / 1K</TableHead>
+  1387→                <TableHead className="text-right">Out / 1K</TableHead>
+  1388→                <TableHead>Status</TableHead>
+  1389→              </TableRow>
+  1390→            </TableHeader>
+  1391→            <TableBody>
+  1392→              {filtered.length === 0 ? (
+  1393→                <TableRow>
+  1394→                  <TableCell colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No models match your filters</TableCell>
+  1395→                </TableRow>
+  1396→              ) : (
+  1397→                filtered.map((m) => {
+  1398→                  const provider = GATEWAY_PROVIDERS.find((p) => p.type === m.provider);
+  1399→                  return (
+  1400→                    <TableRow key={m.id}>
+  1401→                      <TableCell>
+  1402→                        <p className="font-medium">{m.name}</p>
+  1403→                        <p className="text-[10px] text-muted-foreground font-mono">{m.id}</p>
+  1404→                      </TableCell>
+  1405→                      <TableCell>
+  1406→                        <span className="inline-flex items-center gap-1.5 text-xs">
+  1407→                          <span>{provider?.icon}</span>
+  1408→                          <span>{provider?.name}</span>
+  1409→                        </span>
+  1410→                      </TableCell>
+  1411→                      <TableCell className="text-xs">
+  1412→                        <span className="font-mono">{formatGatewayContext(m.context)}</span>
+  1413→                        <span className="text-muted-foreground ml-1">tok</span>
+  1414→                      </TableCell>
+  1415→                      <TableCell>
+  1416→                        <div className="flex flex-wrap gap-1">
+  1417→                          <CapabilityBadge label="Vision" active={m.vision} type="vision" />
+  1418→                          <CapabilityBadge label="Tools" active={m.tools} type="tools" />
+  1419→                          <CapabilityBadge label="JSON" active={m.json} type="json" />
+  1420→                          <CapabilityBadge label="Stream" active={m.streaming} type="streaming" />
+  1421→                        </div>
+  1422→                      </TableCell>
+  1423→                      <TableCell className="text-right font-mono text-xs">{formatGatewayCost(m.inputCost)}</TableCell>
+  1424→                      <TableCell className="text-right font-mono text-xs">{formatGatewayCost(m.outputCost)}</TableCell>
+  1425→                      <TableCell>
+  1426→                        <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-400/30 bg-emerald-400/10">
+  1427→                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1" />
+  1428→                          {m.status}
+  1429→                        </Badge>
+  1430→                      </TableCell>
+  1431→                    </TableRow>
+  1432→                  );
+  1433→                })
+  1434→              )}
+  1435→            </TableBody>
+  1436→          </Table>
+  1437→        </div>
+  1438→      </CardContent>
+  1439→    </Card>
+  1440→  );
+  1441→}
+  1442→
+  1443→// ─── Gateway API Keys Sub-Tab ─────────────────────────────────
+  1444→
+  1445→function GatewayApiKeys() {
+  1446→  const [keys, setKeys] = useState<GatewayApiKey[]>(GATEWAY_API_KEYS);
+  1447→  const [addOpen, setAddOpen] = useState(false);
+  1448→  const [newKey, setNewKey] = useState({ provider: 'OPENAI', apiKey: '', baseUrl: '', org: 'Personal' });
+  1449→  const [showKey, setShowKey] = useState(false);
+  1450→  const [saving, setSaving] = useState(false);
+  1451→  const [copiedId, setCopiedId] = useState<string | null>(null);
+  1452→
+  1453→  const handleAdd = () => {
+  1454→    if (!newKey.apiKey) return;
+  1455→    setSaving(true);
+  1456→    setTimeout(() => {
+  1457→      const provider = GATEWAY_PROVIDERS.find((p) => p.type === newKey.provider);
+  1458→      const keyMask = newKey.apiKey.length > 10
+  1459→        ? `${newKey.apiKey.slice(0, 6)}...${newKey.apiKey.slice(-4)}`
+  1460→        : '••••••••';
+  1461→      setKeys((prev) => [{
+  1462→        id: Date.now().toString(),
+  1463→        provider: newKey.provider,
+  1464→        prefix: keyMask,
+  1465→        label: `${provider?.name || newKey.provider} Key`,
+  1466→        baseUrl: newKey.baseUrl,
+  1467→        org: newKey.org || 'Personal',
+  1468→        lastUsed: 'Never',
+  1469→        created: new Date().toISOString().slice(0, 10),
+  1470→        status: 'active',
+  1471→      }, ...prev]);
+  1472→      setNewKey({ provider: 'OPENAI', apiKey: '', baseUrl: '', org: 'Personal' });
+  1473→      setSaving(false);
+  1474→      setAddOpen(false);
+  1475→    }, 600);
+  1476→  };
+  1477→
+  1478→  const handleCopy = (id: string, prefix: string) => {
+  1479→    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+  1480→      navigator.clipboard.writeText(prefix).catch(() => {});
+  1481→    }
+  1482→    setCopiedId(id);
+  1483→    setTimeout(() => setCopiedId(null), 1500);
+  1484→  };
+  1485→
+  1486→  const handleRevoke = (id: string) => {
+  1487→    setKeys((prev) => prev.filter((k) => k.id !== id));
+  1488→  };
+  1489→
+  1490→  return (
+  1491→    <Card>
+  1492→      <CardHeader className="flex flex-row items-center justify-between gap-3">
+  1493→        <div>
+  1494→          <CardTitle className="text-lg flex items-center gap-2"><Key className="h-5 w-5 text-cyan-400" />API Keys</CardTitle>
+  1495→          <CardDescription>Manage provider credentials · {keys.length} keys configured</CardDescription>
+  1496→        </div>
+  1497→        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+  1498→          <DialogTrigger asChild>
+  1499→            <Button className="bg-cyan-600 hover:bg-cyan-700 text-white shrink-0"><Plus className="h-4 w-4 mr-2" />Add Key</Button>
+  1500→          </DialogTrigger>
+  1501→          <DialogContent>
+  1502→            <DialogHeader>
+  1503→              <DialogTitle>Add API Key</DialogTitle>
+  1504→              <DialogDescription>Configure a new provider credential. Keys are encrypted at rest.</DialogDescription>
+  1505→            </DialogHeader>
+  1506→            <div className="space-y-4">
+  1507→              <div className="space-y-2">
+  1508→                <Label>Provider</Label>
+  1509→                <Select value={newKey.provider} onValueChange={(v) => setNewKey({ ...newKey, provider: v })}>
+  1510→                  <SelectTrigger><SelectValue /></SelectTrigger>
+  1511→                  <SelectContent>
+  1512→                    {GATEWAY_PROVIDERS.map((p) => (<SelectItem key={p.type} value={p.type}><span className="mr-2">{p.icon}</span>{p.name}</SelectItem>))}
+  1513→                  </SelectContent>
+  1514→                </Select>
+  1515→              </div>
+  1516→              <div className="space-y-2">
+  1517→                <Label>API Key</Label>
+  1518→                <div className="relative">
+  1519→                  <Input type={showKey ? 'text' : 'password'} value={newKey.apiKey} onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })} placeholder="sk-..." className="pr-10" />
+  1520→                  <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 hover:bg-transparent" onClick={() => setShowKey(!showKey)}>
+  1521→                    {showKey ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+  1522→                  </Button>
+  1523→                </div>
+  1524→              </div>
+  1525→              <div className="space-y-2">
+  1526→                <Label>Base URL <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+  1527→                <Input value={newKey.baseUrl} onChange={(e) => setNewKey({ ...newKey, baseUrl: e.target.value })} placeholder="https://api.example.com/v1" />
+  1528→              </div>
+  1529→              <div className="space-y-2">
+  1530→                <Label>Organization</Label>
+  1531→                <Select value={newKey.org} onValueChange={(v) => setNewKey({ ...newKey, org: v })}>
+  1532→                  <SelectTrigger><SelectValue placeholder="Select organization" /></SelectTrigger>
+  1533→                  <SelectContent>
+  1534→                    {MOCK_ORGS.map((o) => (<SelectItem key={o.id} value={o.name}>{o.name}</SelectItem>))}
+  1535→                    <SelectItem value="Personal">Personal</SelectItem>
+  1536→                  </SelectContent>
+  1537→                </Select>
+  1538→              </div>
+  1539→              <Button onClick={handleAdd} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" disabled={saving || !newKey.apiKey}>
+  1540→                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+  1541→                Save Key
+  1542→              </Button>
+  1543→            </div>
+  1544→          </DialogContent>
+  1545→        </Dialog>
+  1546→      </CardHeader>
+  1547→      <CardContent className="space-y-2">
+  1548→        {keys.length === 0 ? (
+  1549→          <div className="text-center py-8"><Key className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" /><p className="text-sm text-muted-foreground">No API keys configured yet</p></div>
+  1550→        ) : (
+  1551→          keys.map((key) => {
+  1552→            const provider = GATEWAY_PROVIDERS.find((p) => p.type === key.provider);
+  1553→            const colors = provider ? PROVIDER_COLOR_MAP[provider.color] : PROVIDER_COLOR_MAP.gray;
+  1554→            return (
+  1555→              <div key={key.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors">
+  1556→                <div className="flex items-center gap-3 min-w-0">
+  1557→                  <div className={cn('p-2 rounded-md shrink-0', colors.bg)}>
+  1558→                    <span className="text-base">{provider?.icon}</span>
+  1559→                  </div>
+  1560→                  <div className="min-w-0">
+  1561→                    <div className="flex items-center gap-2 flex-wrap">
+  1562→                      <p className="text-sm font-medium truncate">{key.label}</p>
+  1563→                      <Badge variant="outline" className={cn('text-[10px]', key.status === 'active' ? 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10' : 'text-muted-foreground')}>
+  1564→                        {key.status}
+  1565→                      </Badge>
+  1566→                    </div>
+  1567→                    <div className="flex items-center gap-2 mt-0.5">
+  1568→                      <code className="text-[11px] text-muted-foreground font-mono truncate">{key.prefix}</code>
+  1569→                      <button onClick={() => handleCopy(key.id, key.prefix)} className="text-muted-foreground hover:text-cyan-400 transition-colors shrink-0" aria-label="Copy key">
+  1570→                        {copiedId === key.id ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+  1571→                      </button>
+  1572→                    </div>
+  1573→                  </div>
+  1574→                </div>
+  1575→                <div className="flex items-center gap-4 text-[11px] text-muted-foreground pl-9 sm:pl-0 flex-wrap">
+  1576→                  <div className="flex items-center gap-1"><Building2 className="h-3 w-3" />{key.org}</div>
+  1577→                  <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{key.lastUsed}</div>
+  1578→                  <div className="hidden md:flex items-center gap-1"><Calendar className="h-3 w-3" />{key.created}</div>
+  1579→                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7" onClick={() => handleRevoke(key.id)}>
+  1580→                    <Trash2 className="h-3.5 w-3.5" />
+  1581→                  </Button>
+  1582→                </div>
+  1583→              </div>
+  1584→            );
+  1585→          })
+  1586→        )}
+  1587→      </CardContent>
+  1588→    </Card>
+  1589→  );
+  1590→}
+  1591→
+  1592→// ─── Gateway Usage Sub-Tab ────────────────────────────────────
+  1593→
+  1594→function GatewayUsage() {
+  1595→  const [range, setRange] = useState('7d');
+  1596→
+  1597→  const ranges = [
+  1598→    { value: '24h', label: '24 Hours' },
+  1599→    { value: '7d', label: '7 Days' },
+  1600→    { value: '30d', label: '30 Days' },
+  1601→    { value: '90d', label: '90 Days' },
+  1602→  ];
+  1603→
+  1604→  const requestSeries = [
+  1605→    { label: 'Mon', value: 142 },
+  1606→    { label: 'Tue', value: 168 },
+  1607→    { label: 'Wed', value: 156 },
+  1608→    { label: 'Thu', value: 198 },
+  1609→    { label: 'Fri', value: 224 },
+  1610→    { label: 'Sat', value: 102 },
+  1611→    { label: 'Sun', value: 88 },
+  1612→  ];
+  1613→
+  1614→  const tokensByProvider = [
+  1615→    { provider: 'OPENAI', tokens: 342_000_000, bar: 'bg-emerald-400' },
+  1616→    { provider: 'ANTHROPIC', tokens: 218_000_000, bar: 'bg-purple-400' },
+  1617→    { provider: 'GEMINI', tokens: 156_000_000, bar: 'bg-blue-400' },
+  1618→    { provider: 'DEEPSEEK', tokens: 89_000_000, bar: 'bg-cyan-400' },
+  1619→    { provider: 'GROQ', tokens: 54_000_000, bar: 'bg-orange-400' },
+  1620→    { provider: 'OTHER', tokens: 33_543_120, bar: 'bg-gray-400' },
+  1621→  ];
+  1622→  const totalTokens = tokensByProvider.reduce((s, p) => s + p.tokens, 0);
+  1623→
+  1624→  const costBreakdown = [
+  1625→    { provider: 'OpenAI', cost: 642.18, bar: 'bg-emerald-400' },
+  1626→    { provider: 'Anthropic', cost: 318.45, bar: 'bg-purple-400' },
+  1627→    { provider: 'Gemini', cost: 142.92, bar: 'bg-blue-400' },
+  1628→    { provider: 'DeepSeek', cost: 68.21, bar: 'bg-cyan-400' },
+  1629→    { provider: 'Others', cost: 113.16, bar: 'bg-gray-400' },
+  1630→  ];
+  1631→  const totalCost = costBreakdown.reduce((s, p) => s + p.cost, 0);
+  1632→
+  1633→  const errorSeries = [
+  1634→    { label: 'Mon', value: 0.8 },
+  1635→    { label: 'Tue', value: 1.2 },
+  1636→    { label: 'Wed', value: 0.6 },
+  1637→    { label: 'Thu', value: 2.4 },
+  1638→    { label: 'Fri', value: 1.8 },
+  1639→    { label: 'Sat', value: 0.4 },
+  1640→    { label: 'Sun', value: 0.2 },
+  1641→  ];
+  1642→
+  1643→  const topModels = [
+  1644→    { name: 'GPT-4o', provider: 'OPENAI', requests: 412_543, tokens: 312_000_000, cost: 412.18, pct: 32 },
+  1645→    { name: 'Claude 3.5 Sonnet', provider: 'ANTHROPIC', requests: 286_120, tokens: 198_000_000, cost: 298.45, pct: 22 },
+  1646→    { name: 'GPT-4o Mini', provider: 'OPENAI', requests: 198_432, tokens: 28_000_000, cost: 22.18, pct: 15 },
+  1647→    { name: 'Gemini 1.5 Pro', provider: 'GEMINI', requests: 142_889, tokens: 124_000_000, cost: 102.92, pct: 11 },
+  1648→    { name: 'DeepSeek Chat', provider: 'DEEPSEEK', requests: 98_234, tokens: 71_000_000, cost: 48.21, pct: 8 },
+  1649→  ];
+  1650→
+  1651→  const maxReq = Math.max(...requestSeries.map((r) => r.value));
+  1652→  const maxErr = Math.max(...errorSeries.map((r) => r.value));
+  1653→
+  1654→  return (
+  1655→    <div className="space-y-6">
+  1656→      <div className="flex items-center justify-between gap-3">
+  1657→        <h3 className="text-lg font-medium">Usage Analytics</h3>
+  1658→        <Select value={range} onValueChange={setRange}>
+  1659→          <SelectTrigger className="w-40 h-9"><SelectValue /></SelectTrigger>
+  1660→          <SelectContent>
+  1661→            {ranges.map((r) => (<SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>))}
+  1662→          </SelectContent>
+  1663→        </Select>
+  1664→      </div>
+  1665→
+  1666→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1667→        {/* Requests over time */}
+  1668→        <Card>
+  1669→          <CardHeader>
+  1670→            <CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4 text-cyan-400" />Requests Over Time</CardTitle>
+  1671→            <CardDescription>Daily request volume (in thousands)</CardDescription>
+  1672→          </CardHeader>
+  1673→          <CardContent>
+  1674→            <div className="flex items-end justify-between gap-2 h-40">
+  1675→              {requestSeries.map((r) => (
+  1676→                <div key={r.label} className="flex-1 flex flex-col items-center gap-2">
+  1677→                  <div className="w-full flex items-end h-full">
+  1678→                    <div className="w-full bg-gradient-to-t from-cyan-600/60 to-cyan-400/80 rounded-t-md transition-all hover:from-cyan-500 hover:to-cyan-300" style={{ height: `${(r.value / maxReq) * 100}%` }} title={`${r.value}K`} />
+  1679→                  </div>
+  1680→                  <span className="text-[10px] text-muted-foreground">{r.label}</span>
+  1681→                </div>
+  1682→              ))}
+  1683→            </div>
+  1684→          </CardContent>
+  1685→        </Card>
+  1686→
+  1687→        {/* Error rate */}
+  1688→        <Card>
+  1689→          <CardHeader>
+  1690→            <CardTitle className="text-base flex items-center gap-2"><AlertCircle className="h-4 w-4 text-rose-400" />Error Rate</CardTitle>
+  1691→            <CardDescription>Daily error percentage</CardDescription>
+  1692→          </CardHeader>
+  1693→          <CardContent>
+  1694→            <div className="flex items-end justify-between gap-2 h-40">
+  1695→              {errorSeries.map((r) => (
+  1696→                <div key={r.label} className="flex-1 flex flex-col items-center gap-2">
+  1697→                  <div className="w-full flex items-end h-full">
+  1698→                    <div className="w-full bg-gradient-to-t from-rose-600/60 to-rose-400/80 rounded-t-md transition-all" style={{ height: `${(r.value / maxErr) * 100}%` }} title={`${r.value}%`} />
+  1699→                  </div>
+  1700→                  <span className="text-[10px] text-muted-foreground">{r.label}</span>
+  1701→                </div>
+  1702→              ))}
+  1703→            </div>
+  1704→          </CardContent>
+  1705→        </Card>
+  1706→
+  1707→        {/* Tokens by provider */}
+  1708→        <Card>
+  1709→          <CardHeader>
+  1710→            <CardTitle className="text-base flex items-center gap-2"><Hash className="h-4 w-4 text-emerald-400" />Tokens by Provider</CardTitle>
+  1711→            <CardDescription>{formatGatewayNumber(totalTokens)} tokens total</CardDescription>
+  1712→          </CardHeader>
+  1713→          <CardContent className="space-y-3">
+  1714→            {tokensByProvider.map((p) => (
+  1715→              <div key={p.provider}>
+  1716→                <div className="flex items-center justify-between text-xs mb-1">
+  1717→                  <span className="font-medium">{p.provider}</span>
+  1718→                  <span className="text-muted-foreground">{formatGatewayNumber(p.tokens)} ({((p.tokens / totalTokens) * 100).toFixed(1)}%)</span>
+  1719→                </div>
+  1720→                <div className="h-2 rounded-full bg-muted overflow-hidden">
+  1721→                  <div className={cn('h-full rounded-full transition-all', p.bar)} style={{ width: `${(p.tokens / totalTokens) * 100}%` }} />
+  1722→                </div>
+  1723→              </div>
+  1724→            ))}
+  1725→          </CardContent>
+  1726→        </Card>
+  1727→
+  1728→        {/* Cost breakdown */}
+  1729→        <Card>
+  1730→          <CardHeader>
+  1731→            <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4 text-amber-400" />Cost Breakdown</CardTitle>
+  1732→            <CardDescription>${totalCost.toFixed(2)} total this period</CardDescription>
+  1733→          </CardHeader>
+  1734→          <CardContent>
+  1735→            <div className="flex h-3 rounded-full overflow-hidden mb-4">
+  1736→              {costBreakdown.map((p) => (
+  1737→                <div key={p.provider} className={cn('h-full transition-all', p.bar)} style={{ width: `${(p.cost / totalCost) * 100}%` }} title={`${p.provider}: $${p.cost.toFixed(2)}`} />
+  1738→              ))}
+  1739→            </div>
+  1740→            <div className="grid grid-cols-2 gap-2">
+  1741→              {costBreakdown.map((p) => (
+  1742→                <div key={p.provider} className="flex items-center gap-2 text-xs">
+  1743→                  <span className={cn('h-2.5 w-2.5 rounded-sm shrink-0', p.bar)} />
+  1744→                  <span className="font-medium">{p.provider}</span>
+  1745→                  <span className="text-muted-foreground ml-auto">${p.cost.toFixed(2)}</span>
+  1746→                </div>
+  1747→              ))}
+  1748→            </div>
+  1749→          </CardContent>
+  1750→        </Card>
+  1751→      </div>
+  1752→
+  1753→      {/* Top models */}
+  1754→      <Card>
+  1755→        <CardHeader>
+  1756→          <CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4 text-cyan-400" />Top Models by Usage</CardTitle>
+  1757→        </CardHeader>
+  1758→        <CardContent>
+  1759→          <div className="rounded-md border">
+  1760→            <Table>
+  1761→              <TableHeader>
+  1762→                <TableRow className="text-xs text-muted-foreground">
+  1763→                  <TableHead>Model</TableHead>
+  1764→                  <TableHead className="text-right">Requests</TableHead>
+  1765→                  <TableHead className="text-right">Tokens</TableHead>
+  1766→                  <TableHead className="text-right">Cost</TableHead>
+  1767→                  <TableHead className="w-40">Share</TableHead>
+  1768→                </TableRow>
+  1769→              </TableHeader>
+  1770→              <TableBody>
+  1771→                {topModels.map((m) => {
+  1772→                  const provider = GATEWAY_PROVIDERS.find((p) => p.type === m.provider);
+  1773→                  return (
+  1774→                    <TableRow key={m.name}>
+  1775→                      <TableCell>
+  1776→                        <span className="inline-flex items-center gap-1.5">
+  1777→                          <span>{provider?.icon}</span>
+  1778→                          <span className="font-medium">{m.name}</span>
+  1779→                        </span>
+  1780→                      </TableCell>
+  1781→                      <TableCell className="text-right font-mono text-xs">{formatGatewayNumber(m.requests)}</TableCell>
+  1782→                      <TableCell className="text-right font-mono text-xs">{formatGatewayNumber(m.tokens)}</TableCell>
+  1783→                      <TableCell className="text-right font-mono text-xs">${m.cost.toFixed(2)}</TableCell>
+  1784→                      <TableCell>
+  1785→                        <div className="flex items-center gap-2">
+  1786→                          <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+  1787→                            <div className="h-full bg-gradient-to-r from-cyan-500 to-teal-400 rounded-full" style={{ width: `${m.pct * 3}%` }} />
+  1788→                          </div>
+  1789→                          <span className="text-xs text-muted-foreground w-8 text-right">{m.pct}%</span>
+  1790→                        </div>
+  1791→                      </TableCell>
+  1792→                    </TableRow>
+  1793→                  );
+  1794→                })}
+  1795→              </TableBody>
+  1796→            </Table>
+  1797→          </div>
+  1798→        </CardContent>
+  1799→      </Card>
+  1800→    </div>
+  1801→  );
+  1802→}
+  1803→
+  1804→// ─── Gateway Test Sub-Tab ─────────────────────────────────────
+  1805→
+  1806→interface GatewayTestResult {
+  1807→  success: boolean;
+  1808→  latency: number;
+  1809→  response: string;
+  1810→  inputTokens: number;
+  1811→  outputTokens: number;
+  1812→  cost: number;
+  1813→  error?: string;
+  1814→}
+  1815→
+  1816→function GatewayTest() {
+  1817→  const [provider, setProvider] = useState('OPENAI');
+  1818→  const [model, setModel] = useState('gpt-4o');
+  1819→  const [message, setMessage] = useState('Hello! Please respond with a short greeting.');
+  1820→  const [testing, setTesting] = useState(false);
+  1821→  const [result, setResult] = useState<GatewayTestResult | null>(null);
+  1822→
+  1823→  const models = GATEWAY_MODELS.filter((m) => m.provider === provider);
+  1824→
+  1825→  const handleProviderChange = (newProvider: string) => {
+  1826→    setProvider(newProvider);
+  1827→    const first = GATEWAY_MODELS.find((m) => m.provider === newProvider);
+  1828→    if (first) setModel(first.id);
+  1829→  };
+  1830→
+  1831→  const handleSend = () => {
+  1832→    if (!message.trim() || testing) return;
+  1833→    setTesting(true);
+  1834→    setResult(null);
+  1835→    setTimeout(() => {
+  1836→      const modelData = GATEWAY_MODELS.find((m) => m.id === model);
+  1837→      const providerData = GATEWAY_PROVIDERS.find((p) => p.type === provider);
+  1838→      const isHealthy = provider !== 'HUGGING_FACE';
+  1839→      const latency = 180 + Math.floor(Math.random() * 600);
+  1840→      const inputTokens = Math.ceil(message.length / 4);
+  1841→      const outputTokens = 24 + Math.floor(Math.random() * 60);
+  1842→      const cost = modelData ? ((inputTokens / 1000) * modelData.inputCost + (outputTokens / 1000) * modelData.outputCost) : 0;
+  1843→      setResult({
+  1844→        success: isHealthy,
+  1845→        latency,
+  1846→        response: isHealthy
+  1847→          ? `Hello! This is a simulated response from ${providerData?.name} (${modelData?.name}). I received your message: "${message.substring(0, 80)}${message.length > 80 ? '...' : ''}" — in production this would be a real AI completion streamed from the provider.`
+  1848→          : '',
+  1849→        inputTokens,
+  1850→        outputTokens,
+  1851→        cost,
+  1852→        error: isHealthy ? undefined : 'Connection timed out. Provider is currently unhealthy.',
+  1853→      });
+  1854→      setTesting(false);
+  1855→    }, 1100);
+  1856→  };
+  1857→
+  1858→  return (
+  1859→    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  1860→      {/* Test config */}
+  1861→      <Card>
+  1862→        <CardHeader>
+  1863→          <CardTitle className="text-lg flex items-center gap-2"><TestTube className="h-5 w-5 text-cyan-400" />Connection Tester</CardTitle>
+  1864→          <CardDescription>Send a test request to verify provider connectivity</CardDescription>
+  1865→        </CardHeader>
+  1866→        <CardContent className="space-y-4">
+  1867→          <div className="space-y-2">
+  1868→            <Label>Provider</Label>
+  1869→            <Select value={provider} onValueChange={handleProviderChange}>
+  1870→              <SelectTrigger><SelectValue /></SelectTrigger>
+  1871→              <SelectContent>
+  1872→                {GATEWAY_PROVIDERS.map((p) => (<SelectItem key={p.type} value={p.type}><span className="mr-2">{p.icon}</span>{p.name}</SelectItem>))}
+  1873→              </SelectContent>
+  1874→            </Select>
+  1875→          </div>
+  1876→          <div className="space-y-2">
+  1877→            <Label>Model</Label>
+  1878→            <Select value={model} onValueChange={setModel} disabled={models.length === 0}>
+  1879→              <SelectTrigger><SelectValue placeholder={models.length === 0 ? 'No models available' : 'Select model'} /></SelectTrigger>
+  1880→              <SelectContent>
+  1881→                {models.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
+  1882→              </SelectContent>
+  1883→            </Select>
+  1884→          </div>
+  1885→          <div className="space-y-2">
+  1886→            <Label>Test Message</Label>
+  1887→            <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Enter a test prompt..." className="min-h-[100px]" />
+  1888→          </div>
+  1889→          <Button onClick={handleSend} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" disabled={!message.trim() || testing || models.length === 0}>
+  1890→            {testing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Send className="mr-2 h-4 w-4" />Send Test Request</>}
+  1891→          </Button>
+  1892→        </CardContent>
+  1893→      </Card>
+  1894→
+  1895→      {/* Results */}
+  1896→      <Card>
+  1897→        <CardHeader>
+  1898→          <CardTitle className="text-lg flex items-center gap-2"><Activity className="h-5 w-5 text-cyan-400" />Results</CardTitle>
+  1899→          <CardDescription>Response details and metrics</CardDescription>
+  1900→        </CardHeader>
+  1901→        <CardContent>
+  1902→          {testing ? (
+  1903→            <div className="flex flex-col items-center justify-center py-12">
+  1904→              <Loader2 className="h-8 w-8 text-cyan-400 animate-spin mb-3" />
+  1905→              <p className="text-sm text-muted-foreground">Sending request to provider...</p>
+  1906→            </div>
+  1907→          ) : !result ? (
+  1908→            <div className="flex flex-col items-center justify-center py-12">
+  1909→              <TestTube className="h-10 w-10 text-muted-foreground/30 mb-3" />
+  1910→              <p className="text-sm text-muted-foreground">No test results yet. Send a request to see the response.</p>
+  1911→            </div>
+  1912→          ) : (
+  1913→            <div className="space-y-4">
+  1914→              <div className={cn('flex items-center gap-3 p-3 rounded-lg', result.success ? 'bg-emerald-500/10' : 'bg-rose-500/10')}>
+  1915→                {result.success ? <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" /> : <AlertCircle className="h-5 w-5 text-rose-400 shrink-0" />}
+  1916→                <div>
+  1917→                  <p className={cn('text-sm font-medium', result.success ? 'text-emerald-400' : 'text-rose-400')}>
+  1918→                    {result.success ? 'Request Successful' : 'Request Failed'}
+  1919→                  </p>
+  1920→                  {result.error && <p className="text-xs text-muted-foreground mt-0.5">{result.error}</p>}
+  1921→                </div>
+  1922→              </div>
+  1923→
+  1924→              {result.success && (
+  1925→                <>
+  1926→                  <div className="grid grid-cols-2 gap-3">
+  1927→                    <div className="p-3 rounded-lg bg-muted/50">
+  1928→                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><Gauge className="h-3 w-3" />Latency</div>
+  1929→                      <p className="text-lg font-bold">{result.latency}<span className="text-sm text-muted-foreground ml-1">ms</span></p>
+  1930→                    </div>
+  1931→                    <div className="p-3 rounded-lg bg-muted/50">
+  1932→                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><DollarSign className="h-3 w-3" />Cost</div>
+  1933→                      <p className="text-lg font-bold">${result.cost.toFixed(5)}</p>
+  1934→                    </div>
+  1935→                    <div className="p-3 rounded-lg bg-muted/50">
+  1936→                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><Hash className="h-3 w-3" />Input Tokens</div>
+  1937→                      <p className="text-lg font-bold">{result.inputTokens}</p>
+  1938→                    </div>
+  1939→                    <div className="p-3 rounded-lg bg-muted/50">
+  1940→                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><Hash className="h-3 w-3" />Output Tokens</div>
+  1941→                      <p className="text-lg font-bold">{result.outputTokens}</p>
+  1942→                    </div>
+  1943→                  </div>
+  1944→                  <div>
+  1945→                    <Label className="text-xs text-muted-foreground">Response</Label>
+  1946→                    <div className="mt-1.5 p-3 rounded-lg bg-muted/50 border border-border text-sm leading-relaxed max-h-48 overflow-y-auto">
+  1947→                      {result.response}
+  1948→                    </div>
+  1949→                  </div>
+  1950→                </>
+  1951→              )}
+  1952→            </div>
+  1953→          )}
+  1954→        </CardContent>
+  1955→      </Card>
+  1956→    </div>
+  1957→  );
+  1958→}
+  1959→
+  1960→// ─── Gateway Main View ────────────────────────────────────────
+  1961→
+  1962→function GatewayView() {
+  1963→  const [gatewayTab, setGatewayTab] = useState('overview');
+  1964→
+  1965→  return (
+  1966→    <div className="space-y-6 animate-in fade-in duration-300">
+  1967→      <div>
+  1968→        <h2 className="text-2xl font-bold flex items-center gap-2">
+  1969→          <Zap className="h-6 w-6 text-cyan-400" />
+  1970→          AI Gateway
+  1971→        </h2>
+  1972→        <p className="text-sm text-muted-foreground mt-1">Unified AI provider management, routing, and observability across {GATEWAY_PROVIDERS.length} providers</p>
+  1973→      </div>
+  1974→      <Tabs value={gatewayTab} onValueChange={setGatewayTab}>
+  1975→        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+  1976→          <TabsTrigger value="overview" className="text-xs sm:text-sm"><Activity className="h-3.5 w-3.5 mr-1.5" />Overview</TabsTrigger>
+  1977→          <TabsTrigger value="models" className="text-xs sm:text-sm"><Cpu className="h-3.5 w-3.5 mr-1.5" />Models</TabsTrigger>
+  1978→          <TabsTrigger value="keys" className="text-xs sm:text-sm"><Key className="h-3.5 w-3.5 mr-1.5" />API Keys</TabsTrigger>
+  1979→          <TabsTrigger value="usage" className="text-xs sm:text-sm"><BarChart3 className="h-3.5 w-3.5 mr-1.5" />Usage</TabsTrigger>
+  1980→          <TabsTrigger value="test" className="text-xs sm:text-sm"><TestTube className="h-3.5 w-3.5 mr-1.5" />Test</TabsTrigger>
+  1981→        </TabsList>
+  1982→        <TabsContent value="overview" className="mt-6"><GatewayOverview /></TabsContent>
+  1983→        <TabsContent value="models" className="mt-6"><GatewayModels /></TabsContent>
+  1984→        <TabsContent value="keys" className="mt-6"><GatewayApiKeys /></TabsContent>
+  1985→        <TabsContent value="usage" className="mt-6"><GatewayUsage /></TabsContent>
+  1986→        <TabsContent value="test" className="mt-6"><GatewayTest /></TabsContent>
+  1987→      </Tabs>
+  1988→    </div>
+  1989→  );
+  1990→}
+  1991→
+  1992→// ─── Sidebar Nav ──────────────────────────────────────────────
+  1993→
+  1994→const NAV_ITEMS: { tab: Tab; icon: React.ElementType; labelKey: string; adminOnly?: boolean }[] = [
+  1995→  { tab: 'dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  1996→  { tab: 'chat', icon: MessageSquare, labelKey: 'nav.chat' },
+  1997→  { tab: 'gateway', icon: Zap, labelKey: 'nav.gateway' },
+  1998→  { tab: 'organizations', icon: Building2, labelKey: 'nav.organizations' },
+  1999→  { tab: 'projects', icon: FolderKanban, labelKey: 'nav.projects' },
+  2000→  { tab: 'settings', icon: Settings, labelKey: 'nav.settings' },
+
+[showing lines 1-2000 of 2157; use offset=2001 with limit to continue reading]

@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: moataz-ai
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moataz-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_URL
+        previewValue: https://moataz-ai.onrender.com
+        value: https://moataz-ai.onrender.com
+
+databases:
+  - name: moataz-db
+    plan: starter
+    ipAllowList: []

@@ -1,0 +1,944 @@
+     1→generator client {
+     2→  provider = "prisma-client-js"
+     3→}
+     4→
+     5→datasource db {
+     6→  provider = "sqlite"
+     7→  url      = env("DATABASE_URL")
+     8→}
+     9→
+    10→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    11→// ENUMS
+    12→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    13→
+    14→enum RoleName {
+    15→  SUPER_ADMIN
+    16→  ADMIN
+    17→  MANAGER
+    18→  MEMBER
+    19→  GUEST
+    20→}
+    21→
+    22→enum PermissionAction {
+    23→  CREATE
+    24→  READ
+    25→  UPDATE
+    26→  DELETE
+    27→  MANAGE
+    28→}
+    29→
+    30→enum ProviderType {
+    31→  OPENAI
+    32→  GEMINI
+    33→  ANTHROPIC
+    34→  OPENROUTER
+    35→  NVIDIA_NIM
+    36→  HUGGING_FACE
+    37→  MISTRAL
+    38→  GROQ
+    39→  DEEPSEEK
+    40→  COHERE
+    41→  AZURE_OPENAI
+    42→  OLLAMA
+    43→  CUSTOM
+    44→}
+    45→
+    46→enum OAuthProvider {
+    47→  GOOGLE
+    48→  GITHUB
+    49→}
+    50→
+    51→enum AuditAction {
+    52→  CREATE
+    53→  READ
+    54→  UPDATE
+    55→  DELETE
+    56→  LOGIN
+    57→  LOGOUT
+    58→  LOGIN_FAILED
+    59→  PASSWORD_RESET
+    60→  EMAIL_VERIFIED
+    61→  ROLE_CHANGE
+    62→  PERMISSION_CHANGE
+    63→  API_KEY_CREATED
+    64→  API_KEY_REVOKED
+    65→  SETTINGS_CHANGE
+    66→  EXPORT
+    67→}
+    68→
+    69→enum FeatureFlagType {
+    70→  BOOLEAN
+    71→  PERCENTAGE
+    72→  VARIANT
+    73→}
+    74→
+    75→enum NotificationType {
+    76→  INFO
+    77→  SUCCESS
+    78→  WARNING
+    79→  ERROR
+    80→}
+    81→
+    82→enum FileStatus {
+    83→  PENDING
+    84→  PROCESSING
+    85→  COMPLETED
+    86→  FAILED
+    87→}
+    88→
+    89→enum ArtifactType {
+    90→  CODE
+    91→  IMAGE
+    92→  DOCUMENT
+    93→  TABLE
+    94→  CHART
+    95→  MARKDOWN
+    96→  PDF
+    97→  JSON
+    98→  CSV
+    99→  HTML
+   100→  SVG
+   101→}
+   102→
+   103→enum FolderType {
+   104→  CHAT
+   105→  FILE
+   106→  PROJECT
+   107→}
+   108→
+   109→enum MessageStatus {
+   110→  PENDING
+   111→  STREAMING
+   112→  COMPLETED
+   113→  FAILED
+   114→  STOPPED
+   115→}
+   116→
+   117→enum ReactionType {
+   118→  LIKE
+   119→  DISLIKE
+   120→  LOVE
+   121→  THUMBS_UP
+   122→  THUMBS_DOWN
+   123→}
+   124→
+   125→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   126→// CORE: USERS & AUTH
+   127→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   128→
+   129→model User {
+   130→  id                    String                @id @default(cuid())
+   131→  email                 String                @unique
+   132→  name                  String?
+   133→  avatarUrl             String?
+   134→  passwordHash          String?
+   135→  emailVerified         Boolean               @default(false)
+   136→  emailVerifiedAt       DateTime?
+   137→  isActive              Boolean               @default(true)
+   138→  isSuperAdmin          Boolean               @default(false)
+   139→  lastLoginAt           DateTime?
+   140→  lastLoginIp           String?
+   141→  preferredLocale       String                @default("en")
+   142→  timezone              String                @default("UTC")
+   143→  createdAt             DateTime              @default(now())
+   144→  updatedAt             DateTime              @updatedAt
+   145→
+   146→  // Relations
+   147→  sessions              Session[]
+   148→  oauthAccounts         OAuthAccount[]
+   149→  apiKeys               ApiKey[]
+   150→  memberships           Membership[]
+   151→  ownedOrganizations    Organization[]        @relation("OrganizationOwner")
+   152→  chats                 Chat[]
+   153→  messages              Message[]
+   154→  files                 File[]
+   155→  notifications         Notification[]
+   156→  auditLogs             AuditLog[]
+   157→  settings              UserSetting[]
+   158→  featureFlagEvaluations FeatureFlagEvaluation[]
+   159→  folders               Folder[]
+   160→  tags                  Tag[]
+   161→  artifacts             Artifact[]
+   162→  notes                 Note[]
+   163→  tasks                 Task[]
+   164→  chatShares            ChatShare[]
+   165→  messageReactions      MessageReaction[]
+   166→  quickAccessItems      QuickAccess[]
+   167→  promptLibrary         PromptLibrary[]
+   168→  preferences           UserPreference[]
+   169→
+   170→  @@index([email])
+   171→  @@index([isActive])
+   172→}
+   173→
+   174→model Session {
+   175→  id           String   @id @default(cuid())
+   176→  userId       String
+   177→  token        String   @unique
+   178→  refreshToken String   @unique
+   179→  userAgent    String?
+   180→  ipAddress    String?
+   181→  expiresAt    DateTime
+   182→  isRevoked    Boolean  @default(false)
+   183→  createdAt    DateTime @default(now())
+   184→  updatedAt    DateTime @updatedAt
+   185→
+   186→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   187→
+   188→  @@index([userId])
+   189→  @@index([token])
+   190→  @@index([refreshToken])
+   191→  @@index([expiresAt])
+   192→}
+   193→
+   194→model OAuthAccount {
+   195→  id           String        @id @default(cuid())
+   196→  userId       String
+   197→  provider     OAuthProvider
+   198→  providerId   String
+   199→  accessToken  String?
+   200→  refreshToken String?
+   201→  expiresAt    DateTime?
+   202→  createdAt    DateTime      @default(now())
+   203→  updatedAt    DateTime      @updatedAt
+   204→
+   205→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   206→
+   207→  @@unique([provider, providerId])
+   208→  @@index([userId])
+   209→}
+   210→
+   211→model PasswordResetToken {
+   212→  id        String   @id @default(cuid())
+   213→  email     String
+   214→  token     String   @unique
+   215→  expiresAt DateTime
+   216→  usedAt    DateTime?
+   217→  createdAt DateTime @default(now())
+   218→
+   219→  @@index([email])
+   220→  @@index([token])
+   221→}
+   222→
+   223→model EmailVerificationToken {
+   224→  id        String   @id @default(cuid())
+   225→  email     String
+   226→  token     String   @unique
+   227→  expiresAt DateTime
+   228→  usedAt    DateTime?
+   229→  createdAt DateTime @default(now())
+   230→
+   231→  @@index([token])
+   232→}
+   233→
+   234→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   235→// ORGANIZATIONS & TEAMS
+   236→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   237→
+   238→model Organization {
+   239→  id          String   @id @default(cuid())
+   240→  name        String
+   241→  slug        String   @unique
+   242→  logoUrl     String?
+   243→  description String?
+   244→  isActive    Boolean  @default(true)
+   245→  plan        String   @default("free")
+   246→  createdAt   DateTime @default(now())
+   247→  updatedAt   DateTime @updatedAt
+   248→
+   249→  // Relations
+   250→  ownerId     String
+   251→  owner       User       @relation("OrganizationOwner", fields: [ownerId], references: [id])
+   252→  memberships Membership[]
+   253→  teams       Team[]
+   254→  projects    Project[]
+   255→  workspaces  Workspace[]
+   256→  providers   Provider[]
+   257→  apiKeys     ApiKey[]
+   258→  chats       Chat[]
+   259→  files       File[]
+   260→  folders     Folder[]
+   261→  tags        Tag[]
+   262→  artifacts   Artifact[]
+   263→  notes       Note[]
+   264→  tasks       Task[]
+   265→  settings    OrganizationSetting[]
+   266→  auditLogs   AuditLog[]
+   267→
+   268→  @@index([slug])
+   269→  @@index([isActive])
+   270→}
+   271→
+   272→model Team {
+   273→  id             String   @id @default(cuid())
+   274→  name           String
+   275→  slug           String
+   276→  description    String?
+   277→  organizationId String
+   278→  isActive       Boolean  @default(true)
+   279→  createdAt      DateTime @default(now())
+   280→  updatedAt      DateTime @updatedAt
+   281→
+   282→  // Relations
+   283→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   284→  memberships  Membership[]
+   285→
+   286→  @@unique([organizationId, slug])
+   287→  @@index([organizationId])
+   288→}
+   289→
+   290→model Membership {
+   291→  id             String   @id @default(cuid())
+   292→  userId         String
+   293→  organizationId String
+   294→  teamId         String?
+   295→  role           RoleName @default(MEMBER)
+   296→  joinedAt       DateTime @default(now())
+   297→  updatedAt      DateTime @updatedAt
+   298→
+   299→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   300→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   301→  team         Team?        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+   302→
+   303→  @@unique([userId, organizationId])
+   304→  @@index([userId])
+   305→  @@index([organizationId])
+   306→  @@index([teamId])
+   307→}
+   308→
+   309→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   310→// RBAC
+   311→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   312→
+   313→model Role {
+   314→  id          String   @id @default(cuid())
+   315→  name        RoleName @unique
+   316→  description String?
+   317→  createdAt   DateTime @default(now())
+   318→  updatedAt   DateTime @updatedAt
+   319→
+   320→  permissions Permission[]
+   321→}
+   322→
+   323→model Permission {
+   324→  id         String            @id @default(cuid())
+   325→  roleId     String
+   326→  resource   String
+   327→  action     PermissionAction
+   328→  createdAt  DateTime          @default(now())
+   329→
+   330→  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+   331→
+   332→  @@unique([roleId, resource, action])
+   333→  @@index([roleId])
+   334→}
+   335→
+   336→model Analytics {
+   337→  id             String   @id @default(cuid())
+   338→  organizationId String
+   339→  event          String
+   340→  properties     String?  // JSON string
+   341→  userId         String?
+   342→  createdAt      DateTime @default(now())
+   343→
+   344→  @@index([organizationId])
+   345→  @@index([event])
+   346→  @@index([createdAt])
+   347→}
+   348→
+   349→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   350→// PROJECTS & WORKSPACES
+   351→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   352→
+   353→model Project {
+   354→  id             String   @id @default(cuid())
+   355→  name           String
+   356→  slug           String
+   357→  description    String?
+   358→  icon           String?
+   359→  color          String?
+   360→  organizationId String
+   361→  isActive       Boolean  @default(true)
+   362→  createdAt      DateTime @default(now())
+   363→  updatedAt      DateTime @updatedAt
+   364→
+   365→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   366→  workspaces   Workspace[]
+   367→  chats        Chat[]
+   368→  files        File[]
+   369→  artifacts    Artifact[]
+   370→  notes        Note[]
+   371→  tasks        Task[]
+   372→  workspaceVariables WorkspaceVariable[]
+   373→
+   374→  @@unique([organizationId, slug])
+   375→  @@index([organizationId])
+   376→}
+   377→
+   378→model Workspace {
+   379→  id             String   @id @default(cuid())
+   380→  name           String
+   381→  description    String?
+   382→  organizationId String
+   383→  projectId      String
+   384→  layout         String?  // JSON string for workspace layout
+   385→  createdAt      DateTime @default(now())
+   386→  updatedAt      DateTime @updatedAt
+   387→
+   388→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   389→  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+   390→
+   391→  @@index([organizationId])
+   392→  @@index([projectId])
+   393→}
+   394→
+   395→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   396→// AI: CHAT & MESSAGES
+   397→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   398→
+   399→model Chat {
+   400→  id             String   @id @default(cuid())
+   401→  title          String?
+   402→  organizationId String
+   403→  projectId      String?
+   404→  userId         String
+   405→  folderId       String?
+   406→  providerType   ProviderType?
+   407→  modelId        String?
+   408→  isArchived     Boolean  @default(false)
+   409→  isPinned       Boolean  @default(false)
+   410→  isFavorite     Boolean  @default(false)
+   411→  isShared       Boolean  @default(false)
+   412→  parentChatId   String?  // For conversation branching
+   413→  modelParams    String?  // JSON: temperature, topP, maxTokens, etc.
+   414→  lastMessageAt  DateTime?
+   415→  createdAt      DateTime @default(now())
+   416→  updatedAt      DateTime @updatedAt
+   417→
+   418→  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+   419→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   420→  project      Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+   421→  folder       Folder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
+   422→  parentChat   Chat?      @relation("ChatBranch", fields: [parentChatId], references: [id], onDelete: SetNull)
+   423→  branches     Chat[]     @relation("ChatBranch")
+   424→  messages     Message[]
+   425→  tags         ChatTag[]
+   426→  shares       ChatShare[]
+   427→  artifacts    Artifact[]
+   428→
+   429→  @@index([userId])
+   430→  @@index([organizationId])
+   431→  @@index([projectId])
+   432→  @@index([folderId])
+   433→  @@index([createdAt])
+   434→  @@index([isPinned])
+   435→  @@index([isArchived])
+   436→}
+   437→
+   438→model Message {
+   439→  id        String   @id @default(cuid())
+   440→  chatId    String
+   441→  userId    String?
+   442→  role      String   // user, assistant, system, tool
+   443→  content   String
+   444→  model     String?
+   445→  tokensIn  Int?
+   446→  tokensOut Int?
+   447→  status    MessageStatus @default(COMPLETED)
+   448→  metadata  String?  // JSON string
+   449→  parentMessageId String? // For branching/versioning
+   450→  createdAt DateTime @default(now())
+   451→  updatedAt DateTime @updatedAt
+   452→
+   453→  user    User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+   454→  chat    Chat            @relation(fields: [chatId], references: [id], onDelete: Cascade)
+   455→  versions MessageVersion[]
+   456→  reactions MessageReaction[]
+   457→  artifacts Artifact[]
+   458→
+   459→  @@index([chatId])
+   460→  @@index([createdAt])
+   461→  @@index([parentMessageId])
+   462→}
+   463→
+   464→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   465→// AI: PROVIDERS & MODELS
+   466→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   467→
+   468→model Provider {
+   469→  id             String       @id @default(cuid())
+   470→  organizationId String
+   471→  type           ProviderType
+   472→  name           String
+   473→  apiKey         String?      // encrypted
+   474→  baseUrl        String?
+   475→  isActive       Boolean      @default(true)
+   476→  config         String?      // JSON string
+   477→  createdAt      DateTime     @default(now())
+   478→  updatedAt      DateTime     @updatedAt
+   479→
+   480→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   481→  models       Model[]
+   482→
+   483→  @@index([organizationId])
+   484→  @@index([type])
+   485→}
+   486→
+   487→model Model {
+   488→  id          String   @id @default(cuid())
+   489→  providerId  String
+   490→  externalId  String   // model ID as known by the provider
+   491→  name        String
+   492→  description String?
+   493→  contextWindow Int?
+   494→  isActive    Boolean  @default(true)
+   495→  pricing     String?  // JSON string for pricing info
+   496→  capabilities String? // JSON string for supported capabilities
+   497→  createdAt   DateTime @default(now())
+   498→  updatedAt   DateTime @updatedAt
+   499→
+   500→  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+   501→
+   502→  @@unique([providerId, externalId])
+   503→  @@index([providerId])
+   504→}
+   505→
+   506→model PromptTemplate {
+   507→  id             String   @id @default(cuid())
+   508→  organizationId String
+   509→  name           String
+   510→  description    String?
+   511→  content        String
+   512→  variables      String?  // JSON string
+   513→  isPublic       Boolean  @default(false)
+   514→  createdAt      DateTime @default(now())
+   515→  updatedAt      DateTime @updatedAt
+   516→
+   517→  @@index([organizationId])
+   518→  @@index([name])
+   519→}
+   520→
+   521→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   522→// FILES & DOCUMENTS
+   523→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   524→
+   525→model File {
+   526→  id             String     @id @default(cuid())
+   527→  name           String
+   528→  originalName   String
+   529→  mimeType       String
+   530→  size           Int
+   531→  storageKey     String
+   532→  url            String?
+   533→  organizationId String
+   534→  projectId      String?
+   535→  folderId       String?
+   536→  userId         String
+   537→  status         FileStatus @default(PENDING)
+   538→  metadata       String?    // JSON string
+   539→  version        Int        @default(1)
+   540→  parentFileId   String?    // For version history
+   541→  createdAt      DateTime   @default(now())
+   542→  updatedAt      DateTime   @updatedAt
+   543→
+   544→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   545→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   546→  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+   547→  folder       Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+   548→  versions     File[]       @relation("FileVersions")
+   549→  parent       File?        @relation("FileVersions", fields: [parentFileId], references: [id], onDelete: SetNull)
+   550→
+   551→  @@index([organizationId])
+   552→  @@index([userId])
+   553→  @@index([projectId])
+   554→  @@index([folderId])
+   555→  @@index([mimeType])
+   556→  @@index([parentFileId])
+   557→}
+   558→
+   559→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   560→// API KEYS
+   561→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   562→
+   563→model ApiKey {
+   564→  id             String   @id @default(cuid())
+   565→  userId         String
+   566→  organizationId String?
+   567→  name           String
+   568→  keyHash        String   @unique
+   569→  keyPrefix      String   // first 8 chars for identification
+   570→  permissions    String?  // JSON string
+   571→  lastUsedAt     DateTime?
+   572→  expiresAt      DateTime?
+   573→  isRevoked      Boolean  @default(false)
+   574→  createdAt      DateTime @default(now())
+   575→  updatedAt      DateTime @updatedAt
+   576→
+   577→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   578→  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   579→
+   580→  @@index([userId])
+   581→  @@index([keyHash])
+   582→  @@index([keyPrefix])
+   583→}
+   584→
+   585→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   586→// NOTIFICATIONS
+   587→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   588→
+   589→model Notification {
+   590→  id         String           @id @default(cuid())
+   591→  userId     String
+   592→  type       NotificationType
+   593→  title      String
+   594→  message    String
+   595→  link       String?
+   596→  isRead     Boolean          @default(false)
+   597→  readAt     DateTime?
+   598→  createdAt  DateTime         @default(now())
+   599→
+   600→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   601→
+   602→  @@index([userId])
+   603→  @@index([isRead])
+   604→  @@index([createdAt])
+   605→}
+   606→
+   607→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   608→// AUDIT LOGS
+   609→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   610→
+   611→model AuditLog {
+   612→  id             String       @id @default(cuid())
+   613→  userId         String?
+   614→  organizationId String?
+   615→  action         AuditAction
+   616→  resource       String
+   617→  resourceId     String?
+   618→  details        String?      // JSON string
+   619→  ipAddress      String?
+   620→  userAgent      String?
+   621→  createdAt      DateTime     @default(now())
+   622→
+   623→  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+   624→  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   625→
+   626→  @@index([userId])
+   627→  @@index([organizationId])
+   628→  @@index([action])
+   629→  @@index([resource])
+   630→  @@index([createdAt])
+   631→}
+   632→
+   633→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   634→// SETTINGS
+   635→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   636→
+   637→model UserSetting {
+   638→  id     String @id @default(cuid())
+   639→  userId String
+   640→  key    String
+   641→  value  String // JSON string
+   642→
+   643→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   644→
+   645→  @@unique([userId, key])
+   646→  @@index([userId])
+   647→}
+   648→
+   649→model OrganizationSetting {
+   650→  id             String @id @default(cuid())
+   651→  organizationId String
+   652→  key            String
+   653→  value          String // JSON string
+   654→
+   655→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   656→
+   657→  @@unique([organizationId, key])
+   658→  @@index([organizationId])
+   659→}
+   660→
+   661→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   662→// FEATURE FLAGS
+   663→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   664→
+   665→model FeatureFlag {
+   666→  id          String          @id @default(cuid())
+   667→  key         String          @unique
+   668→  name        String
+   669→  description String?
+   670→  type        FeatureFlagType @default(BOOLEAN)
+   671→  value       String          // JSON string
+   672→  isActive    Boolean         @default(true)
+   673→  createdAt   DateTime        @default(now())
+   674→  updatedAt   DateTime        @updatedAt
+   675→
+   676→  evaluations FeatureFlagEvaluation[]
+   677→
+   678→  @@index([key])
+   679→  @@index([isActive])
+   680→}
+   681→
+   682→model FeatureFlagEvaluation {
+   683→  id            String   @id @default(cuid())
+   684→  flagId        String
+   685→  userId        String
+   686→  variant       String?
+   687→  evaluatedAt   DateTime @default(now())
+   688→
+   689→  flag FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+   690→  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+   691→
+   692→  @@index([flagId])
+   693→  @@index([userId])
+   694→}
+   695→
+   696→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   697→// PHASE 3: WORKSPACE & CHAT PLATFORM
+   698→// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   699→
+   700→model Folder {
+   701→  id             String     @id @default(cuid())
+   702→  name           String
+   703→  type           FolderType
+   704→  parentId       String?
+   705→  organizationId String
+   706→  userId         String
+   707→  icon           String?
+   708→  color          String?
+   709→  sortOrder      Int        @default(0)
+   710→  createdAt      DateTime   @default(now())
+   711→  updatedAt      DateTime   @updatedAt
+   712→
+   713→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   714→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   715→  parent       Folder?      @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+   716→  children     Folder[]     @relation("FolderHierarchy")
+   717→  chats        Chat[]
+   718→  files        File[]
+   719→
+   720→  @@index([userId])
+   721→  @@index([organizationId])
+   722→  @@index([parentId])
+   723→  @@index([type])
+   724→}
+   725→
+   726→model Tag {
+   727→  id             String   @id @default(cuid())
+   728→  name           String
+   729→  color          String   @default("#6366f1")
+   730→  organizationId String
+   731→  userId         String
+   732→  createdAt      DateTime @default(now())
+   733→
+   734→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   735→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   736→  chats         ChatTag[]
+   737→
+   738→  @@unique([organizationId, name, userId])
+   739→  @@index([userId])
+   740→  @@index([organizationId])
+   741→}
+   742→
+   743→model ChatTag {
+   744→  chatId String
+   745→  tagId  String
+   746→
+   747→  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+   748→  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+   749→
+   750→  @@unique([chatId, tagId])
+   751→  @@index([chatId])
+   752→  @@index([tagId])
+   753→}
+   754→
+   755→model ChatShare {
+   756→  id        String   @id @default(cuid())
+   757→  chatId    String
+   758→  userId    String
+   759→  shareToken String @unique
+   760→  isPublic  Boolean  @default(false)
+   761→  expiresAt DateTime?
+   762→  viewCount Int      @default(0)
+   763→  createdAt DateTime @default(now())
+   764→
+   765→  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+   766→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   767→
+   768→  @@index([chatId])
+   769→  @@index([shareToken])
+   770→}
+   771→
+   772→model MessageVersion {
+   773→  id        String   @id @default(cuid())
+   774→  messageId String
+   775→  content   String
+   776→  version   Int
+   777→  editedBy  String?
+   778→  createdAt DateTime @default(now())
+   779→
+   780→  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+   781→
+   782→  @@index([messageId])
+   783→}
+   784→
+   785→model MessageReaction {
+   786→  id        String       @id @default(cuid())
+   787→  messageId String
+   788→  userId    String
+   789→  type      ReactionType
+   790→  createdAt DateTime     @default(now())
+   791→
+   792→  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+   793→  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+   794→
+   795→  @@unique([messageId, userId, type])
+   796→  @@index([messageId])
+   797→  @@index([userId])
+   798→}
+   799→
+   800→model Artifact {
+   801→  id             String       @id @default(cuid())
+   802→  title          String
+   803→  artifactType   ArtifactType
+   804→  content        String       // The artifact content (code, markdown, JSON, etc.)
+   805→  language       String?      // For code artifacts
+   806→  metadata       String?      // JSON string
+   807→  organizationId String
+   808→  userId         String
+   809→  projectId      String?
+   810→  chatId         String?
+   811→  messageId      String?
+   812→  isPublic       Boolean       @default(false)
+   813→  version        Int           @default(1)
+   814→  parentArtifactId String?
+   815→  createdAt      DateTime      @default(now())
+   816→  updatedAt      DateTime      @updatedAt
+   817→
+   818→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   819→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   820→  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+   821→  chat         Chat?        @relation(fields: [chatId], references: [id], onDelete: SetNull)
+   822→  message      Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+   823→
+   824→  @@index([organizationId])
+   825→  @@index([userId])
+   826→  @@index([projectId])
+   827→  @@index([chatId])
+   828→  @@index([artifactType])
+   829→}
+   830→
+   831→model Note {
+   832→  id             String   @id @default(cuid())
+   833→  title          String
+   834→  content        String
+   835→  organizationId String
+   836→  projectId      String?
+   837→  userId         String
+   838→  isPinned       Boolean  @default(false)
+   839→  tags           String?  // JSON array
+   840→  createdAt      DateTime @default(now())
+   841→  updatedAt      DateTime @updatedAt
+   842→
+   843→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   844→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   845→  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+   846→
+   847→  @@index([userId])
+   848→  @@index([projectId])
+   849→  @@index([isPinned])
+   850→}
+   851→
+   852→model Task {
+   853→  id             String   @id @default(cuid())
+   854→  title          String
+   855→  description    String?
+   856→  status         String   @default("todo") // todo, in-progress, done
+   857→  priority       String   @default("medium") // low, medium, high, urgent
+   858→  organizationId String
+   859→  projectId      String?
+   860→  userId         String
+   861→  assigneeId     String?
+   862→  dueDate        DateTime?
+   863→  completedAt    DateTime?
+   864→  tags           String?  // JSON array
+   865→  createdAt      DateTime @default(now())
+   866→  updatedAt      DateTime @updatedAt
+   867→
+   868→  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+   869→  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+   870→  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+   871→
+   872→  @@index([userId])
+   873→  @@index([projectId])
+   874→  @@index([status])
+   875→}
+   876→
+   877→model QuickAccess {
+   878→  id        String   @id @default(cuid())
+   879→  userId    String
+   880→  itemType  String   // chat, project, file, note, artifact
+   881→  itemId    String
+   882→  label     String
+   883→  icon      String?
+   884→  sortOrder Int      @default(0)
+   885→  createdAt DateTime @default(now())
+   886→
+   887→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   888→
+   889→  @@unique([userId, itemType, itemId])
+   890→  @@index([userId])
+   891→}
+   892→
+   893→model WorkspaceVariable {
+   894→  id             String   @id @default(cuid())
+   895→  key            String
+   896→  value          String
+   897→  description    String?
+   898→  isSecret       Boolean  @default(false)
+   899→  organizationId String
+   900→  projectId      String
+   901→  createdAt      DateTime @default(now())
+   902→  updatedAt      DateTime @updatedAt
+   903→
+   904→  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+   905→
+   906→  @@unique([projectId, key])
+   907→  @@index([projectId])
+   908→}
+   909→
+   910→model PromptLibrary {
+   911→  id             String   @id @default(cuid())
+   912→  title          String
+   913→  description    String?
+   914→  content        String
+   915→  category       String   @default("general")
+   916→  tags           String?  // JSON array
+   917→  organizationId String?
+   918→  userId         String
+   919→  isPublic       Boolean  @default(false)
+   920→  isFavorite     Boolean  @default(false)
+   921→  createdAt      DateTime @default(now())
+   922→  updatedAt      DateTime @updatedAt
+   923→
+   924→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   925→
+   926→  @@index([userId])
+   927→  @@index([category])
+   928→  @@index([isPublic])
+   929→}
+   930→
+   931→model UserPreference {
+   932→  id              String   @id @default(cuid())
+   933→  userId          String
+   934→  category        String   // workspace, chat, models, notifications, privacy
+   935→  settings        String   // JSON string
+   936→  createdAt       DateTime @default(now())
+   937→  updatedAt       DateTime @updatedAt
+   938→
+   939→  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+   940→
+   941→  @@unique([userId, category])
+   942→  @@index([userId])
+   943→}
+   944→
