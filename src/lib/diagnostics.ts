@@ -31,7 +31,7 @@ export async function runStartupDiagnostics() {
   logger.info(`AI Providers diagnostic: ${providers.length} providers registered`);
 
   // 3. Environment Check
-  const missingRequired = [];
+  const missingRequired: string[] = [];
   if (!process.env.DATABASE_URL) missingRequired.push('DATABASE_URL');
   if (!process.env.JWT_SECRET) missingRequired.push('JWT_SECRET');
   if (!process.env.ENCRYPTION_MASTER_KEY) missingRequired.push('ENCRYPTION_MASTER_KEY');

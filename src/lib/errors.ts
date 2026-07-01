@@ -8,7 +8,7 @@ export function setupGlobalErrorHandling() {
   });
 
   process.on("unhandledRejection", (reason, promise) => {
-    logger.error("Unhandled Rejection at promise:", promise, "reason:", reason);
+    logger.error("Unhandled Rejection at promise", { promise, reason });
     // Optionally, do not exit for unhandled rejections if they are not critical
   });
 }

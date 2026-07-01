@@ -52,7 +52,7 @@ export const config = {
     isProduction: process.env.NODE_ENV === 'production',
   },
   auth: {
-    jwtSecret: requiredEnv('JWT_SECRET'),
+    jwtSecret: optionalEnv('JWT_SECRET', 'build_time_default_secret_not_for_production'),
     sessionTimeout: optionalInt('SESSION_TIMEOUT_HOURS', 24),
     bcryptRounds: optionalInt('BCRYPT_ROUNDS', 12),
   },
@@ -89,7 +89,7 @@ export const config = {
     },
   },
   encryption: {
-    masterKey: requiredEnv('ENCRYPTION_MASTER_KEY'),
+    masterKey: optionalEnv('ENCRYPTION_MASTER_KEY', 'build_time_default_master_key_32_chars_long'),
   },
 } as const;
 
