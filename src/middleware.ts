@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { recordRequestDuration } from './lib/metrics';
+// import { recordRequestDuration } from './lib/metrics';
 
 // Security headers for all responses
 const SECURITY_HEADERS: Record<string, string> = {
@@ -124,7 +124,7 @@ export function middleware(request: NextRequest) {
   // Log response time
   response.headers.set('X-Response-Time', `${Date.now() - startTime}ms`);
   const durationMs = Date.now() - startTime;
-  recordRequestDuration(request.method, pathname, response.status, durationMs);
+  // recordRequestDuration(request.method, pathname, response.status, durationMs);
   console.log(JSON.stringify({
     level: 'info',
     ts: new Date().toISOString(),
