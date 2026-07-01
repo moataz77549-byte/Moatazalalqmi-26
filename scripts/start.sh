@@ -24,14 +24,19 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 
 # Mask credentials when logging the DB target
-DB_HOST=$(printf '%s' "$DATABASE_URL" | sed -E 's#.*://[^@]*@##; s#/.*##')
+# Extract host safely even with special chars in password
+DB_HOST=$(printf '%s' "$DATABASE_URL" | awk -F'@' '{print $NF}' | cut -d'/' -f1)
 log "Database target: ${DB_HOST}"
 
 # ---------- 2. Retry DB connection ----------
 MAX_RETRIES=10
 RETRY_DELAY=3
 attempt=1
-until printf 'SELECT 1;' | bunx prisma db execute --stdin >/dev/null 2>&1; do
+# Use a simple connection check that is less sensitive to Prisma CLI startup overhead
+until bunx prisma db execute --stdin --url "$DATABASE_URL" <<EOF
+SELECT 1;
+EOF
+do
   if [ "$attempt" -ge "$MAX_RETRIES" ]; then
     err "Database unreachable after ${MAX_RETRIES} attempts — exiting"
     exit 1
