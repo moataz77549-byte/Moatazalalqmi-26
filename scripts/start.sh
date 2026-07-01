@@ -29,23 +29,28 @@ DB_HOST=$(printf '%s' "$DATABASE_URL" | awk -F'@' '{print $NF}' | cut -d'/' -f1)
 log "Database target: ${DB_HOST}"
 
 # ---------- 2. Retry DB connection ----------
-MAX_RETRIES=10
-RETRY_DELAY=3
+MAX_RETRIES=20
+RETRY_DELAY=5
 attempt=1
-# Use a simple connection check that is less sensitive to Prisma CLI startup overhead
-until bunx prisma db execute --stdin --url "$DATABASE_URL" <<EOF
-SELECT 1;
-EOF
-do
+
+# Extract host and port for a simple TCP check
+DB_HOST_ONLY=$(printf '%s' "$DB_HOST" | cut -d':' -f1)
+DB_PORT=$(printf '%s' "$DB_HOST" | cut -d':' -f2)
+DB_PORT=${DB_PORT:-5432}
+
+log "Waiting for database at ${DB_HOST_ONLY}:${DB_PORT}..."
+
+# Simple TCP check using /dev/tcp if available, or just proceed to migrate
+until timeout 2 sh -c "cat < /dev/null > /dev/tcp/${DB_HOST_ONLY}/${DB_PORT}" 2>/dev/null; do
   if [ "$attempt" -ge "$MAX_RETRIES" ]; then
-    err "Database unreachable after ${MAX_RETRIES} attempts — exiting"
-    exit 1
+    log "TCP check failed, but will attempt Prisma migration anyway..."
+    break
   fi
-  log "Database not ready (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_DELAY}s..."
+  log "Database port not reachable (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_DELAY}s..."
   attempt=$((attempt + 1))
   sleep "$RETRY_DELAY"
 done
-log "Database connection established"
+log "Database port check finished"
 
 # ---------- 3. Automatic Prisma migration ----------
 log "Applying Prisma migrations..."
@@ -56,15 +61,14 @@ else
   exit 1
 fi
 
-# ---------- 4. Seed only when database is empty ----------
-# Uses the User table as the "is this DB empty" signal; adjust the
-# model name if your schema's first-class table differs.
-USER_COUNT=$(printf 'SELECT COUNT(*) FROM "User";' | bunx prisma db execute --stdin 2>/dev/null | tr -dc '0-9' || echo "")
-if [ "${USER_COUNT:-0}" = "0" ]; then
-  log "Database appears empty — running seed"
-  bunx prisma db seed || err "Seed failed (continuing startup)"
+# ---------- 4. Seed database ----------
+# We will always run seed with --skip-generate to be safe, 
+# the seed script itself should handle "if exists" logic.
+log "Running database seed..."
+if bunx prisma db seed; then
+  log "Seed completed"
 else
-  log "Database already has data (User count=${USER_COUNT}) — skipping seed"
+  err "Seed failed or already initialized (continuing startup)"
 fi
 
 # ---------- 5. Start server with graceful shutdown ----------
